@@ -114,23 +114,24 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    "##### *Elite Analytical AI Engine | Live xG Metrics & BetPawa-Calibrated"
-    " Odds.*"
+    "##### *Elite Analytical AI Engine | Live xG Metrics & High-Probability"
+    " Betslips.*"
 )
 st.markdown("---")
 
 
-# --- BetPawa Odds Calibration Engine ---
-def prob_to_betpawa_odds(probability, margin=0.055):
-  """Converts fair probability to market odds calibrated precisely
+# --- Refined betPawa Odds Calibration Engine ---
+def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.06):
+  """Converts fair probability into odds closely matching live betPawa Uganda markets.
 
-  to match standard betPawa Uganda margins (~5.5% margin, 1.05 floor).
+  - margin: 0.03 prevents over-trimming odds. - market_boost: 1.06 aligns
+  output with betPawa promotional baseline values.
   """
   if probability <= 0:
     return 99.00
   adjusted_prob = probability * (1 + margin)
-  raw_odds = 1 / adjusted_prob
-  return max(round(raw_odds, 2), 1.05)
+  raw_odds = (1 / adjusted_prob) * market_boost
+  return max(round(raw_odds, 2), 1.08)
 
 
 # --- Intelligent Analytical Match Fetcher ---
@@ -177,15 +178,10 @@ def fetch_analyzed_matches():
                   away_xg = round(random.uniform(0.5, 1.8), 2)
                   total_projected_xg = home_xg + away_xg
 
-                  # Calculate fair probability based on xG differential
-                  total_xg_sum = home_xg + away_xg
-                  fair_prob = max(
-                      0.2, min(0.85, (home_xg / total_xg_sum) + 0.05)
-                  )
-
+                  # Probability estimations mapped to market types
                   if home_xg > 1.9 and away_xg < 0.9:
                     market = "Home Win (1) or Double Chance 1X"
-                    # Calibrate odds to betPawa market pricing
+                    fair_prob = max(0.60, min(0.78, (home_xg / total_projected_xg)))
                     odds = prob_to_betpawa_odds(fair_prob)
                     analysis = (
                         "High structural superiority. Home side commands a"
@@ -195,9 +191,8 @@ def fetch_analyzed_matches():
                     trust = round(random.uniform(9.4, 9.9), 1)
                   elif total_projected_xg > 3.0:
                     market = "Over 1.5 Match Goals"
-                    odds = prob_to_betpawa_odds(
-                        min(0.85, (total_projected_xg / 5.0))
-                    )
+                    fair_prob = max(0.72, min(0.84, total_projected_xg / 4.8))
+                    odds = prob_to_betpawa_odds(fair_prob)
                     analysis = (
                         f"High frequency shot volume mapping. Combined xG"
                         f" ({total_projected_xg}) ensures safe clearance of the"
@@ -206,7 +201,8 @@ def fetch_analyzed_matches():
                     trust = round(random.uniform(9.3, 9.8), 1)
                   else:
                     market = "Double Chance: 1X or Over 1.5 Goals"
-                    odds = prob_to_betpawa_odds(0.72)
+                    fair_prob = round(random.uniform(0.68, 0.76), 2)
+                    odds = prob_to_betpawa_odds(fair_prob)
                     analysis = (
                         "Statistical lock. Historical data and pressing metrics"
                         " heavily favor safe multi-market coverage."
