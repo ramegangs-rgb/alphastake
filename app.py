@@ -120,9 +120,9 @@ st.markdown(
 st.markdown("---")
 
 
-# --- Refined betPawa Odds Calibration Engine ---
-def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.06):
-  """Converts fair probability into odds closely matching live betPawa markets."""
+# --- Fine-Tuned betPawa Odds Calibration Engine ---
+def prob_to_betpawa_odds(probability, margin=0.04, market_boost=1.04):
+  """Converts fair probability into odds closely matching live betPawa Uganda markets."""
   if probability <= 0:
     return 99.00
   adjusted_prob = probability * (1 + margin)
@@ -140,7 +140,6 @@ def fetch_analyzed_matches():
 
   for d_str in dates_to_fetch:
     try:
-      # Global ESPN Soccer Endpoint (Fetches all active international & club matches)
       url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d_str}"
       res = requests.get(url, timeout=5)
       if res.status_code == 200:
@@ -217,7 +216,7 @@ st.markdown("### 🎯 Betslip Configuration")
 target_odds = st.number_input(
     "Target Number of Odds:",
     min_value=1.10,
-    max_value=50.00,
+    max_value=20.00,
     value=4.00,
     step=0.50,
 )
@@ -239,7 +238,7 @@ if "generated_slip" not in st.session_state:
 if "slip_title" not in st.session_state:
   st.session_state.slip_title = "AI Optimized Betslip"
 
-# Handle standard generation button (Strict 4 Leg Cap)
+# Handle standard generation button (Strict 4 Leg Max Cap)
 if generate_clicked:
   if not MATCH_POOL:
     st.error("⚠️ No fixtures fetched from live feeds right now.")
@@ -255,9 +254,9 @@ if generate_clicked:
         current_prod *= match["odds"]
 
     st.session_state.generated_slip = selected_legs
-    st.session_state.slip_title = "AI Optimized Betslip (Global Live Feeds)"
+    st.session_state.slip_title = "AI Optimized Betslip (Strict 4-Leg Cap)"
 
-# Handle the "sure" button click (Strict 3 Leg Cap)
+# Handle the "sure" button click (Strict 3 Leg Max Cap)
 if sure_clicked:
   if not MATCH_POOL:
     st.error("⚠️ No fixtures fetched from live feeds right now.")
@@ -271,12 +270,12 @@ if sure_clicked:
     current_prod = 1.0
 
     for match in high_confidence_pool:
-      if current_prod < target_odds and len(selected_legs) < 4:
+      if current_prod < target_odds and len(selected_legs) < 3:
         selected_legs.append(match)
         current_prod *= match["odds"]
 
     st.session_state.generated_slip = selected_legs
-    st.session_state.slip_title = "🔥 GLOBAL SURE 97% WIN-RATE SLIP"
+    st.session_state.slip_title = "🔥 GLOBAL SURE 97% SLIP (3-Leg Elite Cap)"
 
 # --- Display Results ---
 st.markdown("---")
@@ -296,7 +295,7 @@ if st.session_state.generated_slip:
         <div class="slip-box">
             <h3 style="margin: 0; color: #10B981;">Target: {target_odds}x &nbsp;|&nbsp; Actual: {round(total_odds, 2)}x</h3>
             <p style="margin: 6px 0 0 0; font-size: 14px;">
-                Legs: {len(st.session_state.generated_slip)} (Controlled Cap) &nbsp;|&nbsp; 
+                Legs: {len(st.session_state.generated_slip)} (Low-Risk Cap) &nbsp;|&nbsp; 
                 Bonus: +{bonus}% &nbsp;|&nbsp; 
                 Est. Payout: <b>{final_payout:,.0f} UGX</b>
             </p>
@@ -319,7 +318,7 @@ if st.session_state.generated_slip:
     )
 
   slip_text = (
-      f"ALPHASTAKE GLOBAL SURE SLIP\nTarget: {target_odds}x | Actual:"
+      f"ALPHASTAKE SURE SLIP\nTarget: {target_odds}x | Actual:"
       f" {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return:"
       f" {final_payout:,.0f} UGX\n"
       + "-" * 35
@@ -334,5 +333,5 @@ if st.session_state.generated_slip:
 else:
   st.info(
       "👈 Set your options above and click the **sure** button to generate"
-      " your club and international slips."
+      " your safe slip."
   )
