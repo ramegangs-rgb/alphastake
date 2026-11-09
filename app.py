@@ -129,8 +129,8 @@ def prob_to_betpawa_odds(probability, margin=0.04, market_boost=1.04):
   return max(round(raw_odds, 2), 1.08)
 
 
-# --- Global Soccer Match Fetcher with Live Status Tracking ---
-@st.cache_data(ttl=60)  # Shortened cache TTL to 60s for live score updates
+# --- Global Soccer Match Fetcher with Safe Fallbacks ---
+@st.cache_data(ttl=60)
 def fetch_analyzed_matches():
   analyzed_matches = []
   today = datetime.now()
@@ -296,7 +296,7 @@ st.subheader(f"📋 {st.session_state.slip_title}")
 if st.session_state.generated_slip:
   total_odds = 1.0
   for leg in st.session_state.generated_slip:
-    total_odds *= leg["odds"]
+    total_odds *= leg.get("odds", 1.25)
 
   payout = total_odds * stake_amount
   bonus = min(len(st.session_state.generated_slip) * 5, 100)
@@ -325,9 +325,18 @@ if st.session_state.generated_slip:
   )
 
   for i, leg in enumerate(st.session_state.generated_slip, 1):
-    # Live Match Status Badge
-    status = leg["status"]
-    score = leg["score"]
+    # Safe lookups with .get() to prevent any KeyError crashes
+    status = leg.get("status", "Scheduled")
+    score = leg.get("score", "0 - 0")
+    home = leg.get("home", "Home")
+    away = leg.get("away", "Away")
+    league = leg.get("league", "Global League")
+    market = leg.get("market", "1X")
+    odds = leg.get("odds", 1.25)
+    trust = leg.get("trust", 9.5)
+    xg = leg.get("xg", "1.0 - 1.0")
+    analysis = leg.get("analysis", "Solid tactical edge.")
+
     if "In Progress" in status or "Half" in status or "Live" in status:
       status_badge = f"🟢 LIVE ({score})"
     elif "Final" in status or "FT" in status:
@@ -338,19 +347,16 @@ if st.session_state.generated_slip:
     st.markdown(
         f"""
             <div class="slip-box">
-                <b>Leg {i}: {leg['home']} vs {leg['away']}</b> ({leg['league']})<br>
-                Selection: <span class="badge-market">{leg['market']}</span> &nbsp; Odds: <b>{leg['odds']}</b> &nbsp; <span class="badge-trust">{status_badge}</span><br>
-                <span style="font-size: 12px; color: rgba(247,247,255,0.6);">Model xG Projection: {leg['xg']}</span>
-                <div class="analysis-text">💡 <b>AI Logic:</b> {leg['analysis']}</div>
+                <b>Leg {i}: {home} vs {away}</b> ({league})<br>
+                Selection: <span class="badge-market">{market}</span> &nbsp; Odds: <b>{odds}</b> &nbsp; <span class="badge-trust">{status_badge}</span><br>
+                <span style="font-size: 12px; color: rgba(247,247,255,0.6);">Model xG Projection: {xg}</span>
+                <div class="analysis-text">💡 <b>AI Logic:</b> {analysis}</div>
             </div>
         """,
         unsafe_allow_html=True,
     )
 
-    slip_text += (
-        f"{i}. {leg['home']} vs {leg['away']} -> {leg['market']} @"
-        f" {leg['odds']}\n"
-    )
+    slip_text += f"{i}. {home} vs {away} -> {market} @ {odds}\n"
 
   # --- WhatsApp One-Click Share Button ---
   encoded_text = urllib.parse.quote(slip_text)
