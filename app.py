@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import random
 import requests
 import streamlit as st
+import urllib.parse
 
 # --- Page Setup ---
 st.set_page_config(
@@ -114,15 +115,13 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    "##### *Elite Analytical AI Engine | Global Club & International xG"
-    " Metrics.*"
+    "##### *Elite Analytical AI Engine | Live Scores & WhatsApp Share.*"
 )
 st.markdown("---")
 
 
 # --- Fine-Tuned betPawa Odds Calibration Engine ---
 def prob_to_betpawa_odds(probability, margin=0.04, market_boost=1.04):
-  """Converts fair probability into odds closely matching live betPawa Uganda markets."""
   if probability <= 0:
     return 99.00
   adjusted_prob = probability * (1 + margin)
@@ -130,8 +129,8 @@ def prob_to_betpawa_odds(probability, margin=0.04, market_boost=1.04):
   return max(round(raw_odds, 2), 1.08)
 
 
-# --- Global Soccer Match Fetcher (All Worldwide Fixtures) ---
-@st.cache_data(ttl=300)
+# --- Global Soccer Match Fetcher with Live Status Tracking ---
+@st.cache_data(ttl=60)  # Shortened cache TTL to 60s for live score updates
 def fetch_analyzed_matches():
   analyzed_matches = []
   today = datetime.now()
@@ -148,12 +147,24 @@ def fetch_analyzed_matches():
           league_name = event.get("season", {}).get(
               "slug", "Global Match"
           ).replace("-", " ").title()
+          status_type = (
+              event.get("status", {})
+              .get("type", {})
+              .get("description", "Scheduled")
+          )
+
           comps = event.get("competitions", [])
           for comp in comps:
             teams = comp.get("competitors", [])
             if len(teams) == 2:
-              home_name = teams[0].get("team", {}).get("displayName")
-              away_name = teams[1].get("team", {}).get("displayName")
+              home_team = teams[0]
+              away_team = teams[1]
+
+              home_name = home_team.get("team", {}).get("displayName")
+              away_name = away_team.get("team", {}).get("displayName")
+              home_score = home_team.get("score", "0")
+              away_score = away_team.get("score", "0")
+
               tag_day = (
                   "Today" if d_str == today.strftime("%Y%m%d") else "Tomorrow"
               )
@@ -196,6 +207,8 @@ def fetch_analyzed_matches():
                 analyzed_matches.append({
                     "home": home_name,
                     "away": away_name,
+                    "score": f"{home_score} - {away_score}",
+                    "status": status_type,
                     "league": f"{league_name} ({tag_day})",
                     "market": market,
                     "odds": odds,
@@ -226,7 +239,6 @@ stake_amount = st.number_input(
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Two-button interactive control panel
 col1, col2 = st.columns(2)
 with col1:
   generate_clicked = st.button("Generate Analytical Slip 🚀")
@@ -238,7 +250,7 @@ if "generated_slip" not in st.session_state:
 if "slip_title" not in st.session_state:
   st.session_state.slip_title = "AI Optimized Betslip"
 
-# Handle standard generation button (Strict 4 Leg Max Cap)
+# Handle standard generation (Strict 4-Leg Cap)
 if generate_clicked:
   if not MATCH_POOL:
     st.error("⚠️ No fixtures fetched from live feeds right now.")
@@ -256,7 +268,7 @@ if generate_clicked:
     st.session_state.generated_slip = selected_legs
     st.session_state.slip_title = "AI Optimized Betslip (Strict 4-Leg Cap)"
 
-# Handle the "sure" button click (Strict 3 Leg Max Cap)
+# Handle "sure" button (Strict 3-Leg Cap)
 if sure_clicked:
   if not MATCH_POOL:
     st.error("⚠️ No fixtures fetched from live feeds right now.")
@@ -277,7 +289,7 @@ if sure_clicked:
     st.session_state.generated_slip = selected_legs
     st.session_state.slip_title = "🔥 GLOBAL SURE 97% SLIP (3-Leg Elite Cap)"
 
-# --- Display Results ---
+# --- Display Results & Live Trackers ---
 st.markdown("---")
 st.subheader(f"📋 {st.session_state.slip_title}")
 
@@ -304,12 +316,30 @@ if st.session_state.generated_slip:
       unsafe_allow_html=True,
   )
 
+  slip_text = (
+      f"⚡ *ALPHASTAKE SURE SLIP* ⚡\nTarget: {target_odds}x | Actual:"
+      f" {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return:"
+      f" {final_payout:,.0f} UGX\n"
+      + "-" * 30
+      + "\n"
+  )
+
   for i, leg in enumerate(st.session_state.generated_slip, 1):
+    # Live Match Status Badge
+    status = leg["status"]
+    score = leg["score"]
+    if "In Progress" in status or "Half" in status or "Live" in status:
+      status_badge = f"🟢 LIVE ({score})"
+    elif "Final" in status or "FT" in status:
+      status_badge = f"🏁 FT ({score})"
+    else:
+      status_badge = f"⏳ {status}"
+
     st.markdown(
         f"""
             <div class="slip-box">
                 <b>Leg {i}: {leg['home']} vs {leg['away']}</b> ({leg['league']})<br>
-                Selection: <span class="badge-market">{leg['market']}</span> &nbsp; Odds: <b>{leg['odds']}</b> &nbsp; <span class="badge-trust">Trust: {leg['trust']}/10</span><br>
+                Selection: <span class="badge-market">{leg['market']}</span> &nbsp; Odds: <b>{leg['odds']}</b> &nbsp; <span class="badge-trust">{status_badge}</span><br>
                 <span style="font-size: 12px; color: rgba(247,247,255,0.6);">Model xG Projection: {leg['xg']}</span>
                 <div class="analysis-text">💡 <b>AI Logic:</b> {leg['analysis']}</div>
             </div>
@@ -317,17 +347,25 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-  slip_text = (
-      f"ALPHASTAKE SURE SLIP\nTarget: {target_odds}x | Actual:"
-      f" {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return:"
-      f" {final_payout:,.0f} UGX\n"
-      + "-" * 35
-      + "\n"
-  )
-  for i, l in enumerate(st.session_state.generated_slip, 1):
     slip_text += (
-        f"{i}. {l['home']} vs {l['away']} -> {l['market']} @ {l['odds']}\n"
+        f"{i}. {leg['home']} vs {leg['away']} -> {leg['market']} @"
+        f" {leg['odds']}\n"
     )
+
+  # --- WhatsApp One-Click Share Button ---
+  encoded_text = urllib.parse.quote(slip_text)
+  whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
+
+  st.markdown(
+      f"""
+        <a href="{whatsapp_url}" target="_blank" style="text-decoration: none;">
+            <div style="background-color: #25D366; color: white; padding: 12px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 15px; box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);">
+                💬 Share Betslip on WhatsApp
+            </div>
+        </a>
+    """,
+      unsafe_allow_html=True,
+  )
 
   st.text_area("📋 Copy Booking Text", slip_text, height=130)
 else:
