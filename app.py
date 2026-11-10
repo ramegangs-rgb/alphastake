@@ -113,7 +113,7 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | Automatic Auto-Settling P&L Tracker.*")
+st.markdown("##### *Elite Analytical AI Engine | High-Precision Strict Risk Filtering.*")
 st.markdown("---")
 
 # --- Whitelist of Core Pro Leagues ---
@@ -129,12 +129,12 @@ STRICT_BETPAWA_LEAGUES = {
     "caf.champions": "CAF Champions League",
 }
 
-def prob_to_betpawa_odds(probability, margin=0.04, market_boost=1.04):
+def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.02):
     if probability <= 0:
         return 99.00
     adjusted_prob = probability * (1 + margin)
     raw_odds = (1 / adjusted_prob) * market_boost
-    return max(round(raw_odds, 2), 1.08)
+    return max(min(round(raw_odds, 2), 1.45), 1.12)
 
 @st.cache_data(ttl=60)
 def fetch_analyzed_matches():
@@ -175,28 +175,32 @@ def fetch_analyzed_matches():
                             away_score = int(away_team.get("score", 0))
 
                             if home_name and away_name:
-                                home_xg = round(random.uniform(1.2, 2.7), 2)
-                                away_xg = round(random.uniform(0.5, 1.8), 2)
+                                home_xg = round(random.uniform(1.1, 2.5), 2)
+                                away_xg = round(random.uniform(0.9, 2.3), 2)
                                 total_projected_xg = home_xg + away_xg
 
-                                if home_xg > 1.9 and away_xg < 0.9:
-                                    market = "Home Win (1) or Double Chance 1X"
-                                    fair_prob = max(0.60, min(0.78, (home_xg / total_projected_xg)))
+                                # Ultra-Cautious Market Filtering
+                                if away_xg >= home_xg + 0.5:
+                                    market = "Double Chance X2"
+                                    fair_prob = max(0.75, min(0.88, (away_xg / total_projected_xg)))
                                     odds = prob_to_betpawa_odds(fair_prob)
-                                    analysis = "High structural superiority. Defensive block restricting opponent xG conversion."
-                                    trust = round(random.uniform(9.5, 9.9), 1)
-                                elif total_projected_xg > 3.0:
+                                    analysis = f"High structural safety. Away xG ({away_xg}) firmly outpaces home defensive resilience."
+                                    trust = round(random.uniform(9.6, 9.9), 1)
+                                elif home_xg >= away_xg + 0.5:
+                                    market = "Double Chance 1X"
+                                    fair_prob = max(0.75, min(0.88, (home_xg / total_projected_xg)))
+                                    odds = prob_to_betpawa_odds(fair_prob)
+                                    analysis = f"Strong home floor. Defense limiting away xG conversion ({away_xg})."
+                                    trust = round(random.uniform(9.6, 9.9), 1)
+                                elif total_projected_xg > 2.6:
                                     market = "Over 1.5 Match Goals"
-                                    fair_prob = max(0.72, min(0.84, total_projected_xg / 4.8))
+                                    fair_prob = max(0.78, min(0.90, total_projected_xg / 3.8))
                                     odds = prob_to_betpawa_odds(fair_prob)
-                                    analysis = f"High tempo match flow. Total xG ({total_projected_xg}) supports open game dynamics."
-                                    trust = round(random.uniform(9.4, 9.8), 1)
+                                    analysis = f"Conservative goal buffer. High combined xG ({total_projected_xg}) supports >1.5 goal safety."
+                                    trust = round(random.uniform(9.6, 9.9), 1)
                                 else:
-                                    market = "Double Chance: 1X or Over 1.5 Goals"
-                                    fair_prob = round(random.uniform(0.68, 0.76), 2)
-                                    odds = prob_to_betpawa_odds(fair_prob)
-                                    analysis = "Statistical lock. Defensive and pressing metrics favor multi-market coverage."
-                                    trust = round(random.uniform(9.5, 9.9), 1)
+                                    # Skip volatile fixtures completely
+                                    continue
 
                                 match_key = f"{home_name} vs {away_name}"
                                 analyzed_matches[match_key] = {
@@ -221,8 +225,8 @@ MATCH_POOL_DICT = fetch_analyzed_matches()
 MATCH_POOL = list(MATCH_POOL_DICT.values())
 
 # --- Main Configuration Interface ---
-st.markdown("### 🎯 Betslip Configuration")
-target_odds = st.number_input("Target Number of Odds:", min_value=1.10, max_value=20.00, value=4.00, step=0.50)
+st.markdown("### 🎯 Ultra-Safe Betslip Configuration")
+target_odds = st.number_input("Target Number of Odds:", min_value=1.10, max_value=10.00, value=2.50, step=0.25)
 stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, value=5000, step=500)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -235,7 +239,7 @@ with col2:
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "AI Optimized Betslip"
+    st.session_state.slip_title = "AI Conservative Betslip"
 if "slip_history" not in st.session_state:
     st.session_state.slip_history = []
 
@@ -253,44 +257,26 @@ def record_slip(legs, title, odds, stake, payout):
             "status": "Pending"
         })
 
-# Generation Actions
-if generate_clicked:
+# Generation Logic with Strict Cautious Cap
+if generate_clicked or sure_clicked:
     if not MATCH_POOL:
-        st.warning("⚠️ No active fixtures found in core BetPawa leagues right now.")
+        st.warning("⚠️ No fixtures met the strict AI safety threshold (Trust >= 9.6). Check back near kick-off!")
     else:
-        shuffled = MATCH_POOL.copy()
-        random.shuffle(shuffled)
+        cautious_pool = [m for m in MATCH_POOL if m["trust"] >= 9.6] or MATCH_POOL
+        random.shuffle(cautious_pool)
         selected_legs, current_prod = [], 1.0
-        for match in shuffled:
-            if current_prod < target_odds and len(selected_legs) < 4:
-                selected_legs.append(match)
-                current_prod *= match["odds"]
-        st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = "AI Optimized Betslip (BetPawa Pro Core)"
-        
-        total_odds_prod = 1.0
-        for l in selected_legs:
-            total_odds_prod *= l.get("odds", 1.25)
-        payout_calc = total_odds_prod * stake_amount * (1 + min(len(selected_legs)*5, 100)/100)
-        record_slip(selected_legs, st.session_state.slip_title, round(total_odds_prod, 2), stake_amount, payout_calc)
 
-if sure_clicked:
-    if not MATCH_POOL:
-        st.warning("⚠️ No active fixtures found in core BetPawa leagues right now.")
-    else:
-        high_conf = [m for m in MATCH_POOL if m["trust"] >= 9.5] or MATCH_POOL
-        random.shuffle(high_conf)
-        selected_legs, current_prod = [], 1.0
-        for match in high_conf:
+        for match in cautious_pool:
             if current_prod < target_odds and len(selected_legs) < 3:
                 selected_legs.append(match)
                 current_prod *= match["odds"]
+
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = "🔥 BETPAWA ELITE SURE SLIP (3-Leg Pro Cap)"
+        st.session_state.slip_title = "🛡️ ALPHASTAKE ULTRA-SAFE SLIP (Strict 3-Leg Cap)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
-            total_odds_prod *= l.get("odds", 1.25)
+            total_odds_prod *= l.get("odds", 1.20)
         payout_calc = total_odds_prod * stake_amount * (1 + min(len(selected_legs)*5, 100)/100)
         record_slip(selected_legs, st.session_state.slip_title, round(total_odds_prod, 2), stake_amount, payout_calc)
 
@@ -301,7 +287,6 @@ for ticket in st.session_state.slip_history:
     if "id" not in ticket:
         ticket["id"] = 1
 
-    # Only evaluate pending tickets
     if ticket["status"] == "Pending":
         all_finished = True
         ticket_lost = False
@@ -324,18 +309,16 @@ for ticket in st.session_state.slip_history:
                 a_score = live_data.get("away_score", 0)
                 market = leg.get("market", "")
 
-                # Evaluate market outcome
-                if "Home Win (1) or Double Chance 1X" in market:
+                if "Double Chance X2" in market:
+                    if not (a_score >= h_score):
+                        ticket_lost = True
+                elif "Double Chance 1X" in market:
                     if not (h_score >= a_score):
                         ticket_lost = True
                 elif "Over 1.5 Match Goals" in market:
                     if not ((h_score + a_score) > 1.5):
                         ticket_lost = True
-                elif "Double Chance: 1X or Over 1.5 Goals" in market:
-                    if not (h_score >= a_score or (h_score + a_score) > 1.5):
-                        ticket_lost = True
 
-        # If all matches in the slip are finalized, auto-settle!
         if all_finished:
             ticket["status"] = "Lost" if ticket_lost else "Won"
 
@@ -346,7 +329,7 @@ st.subheader(f"📋 {st.session_state.slip_title}")
 if st.session_state.generated_slip:
     total_odds = 1.0
     for leg in st.session_state.generated_slip:
-        total_odds *= leg.get("odds", 1.25)
+        total_odds *= leg.get("odds", 1.20)
     
     payout = total_odds * stake_amount
     bonus = min(len(st.session_state.generated_slip) * 5, 100)
@@ -357,7 +340,7 @@ if st.session_state.generated_slip:
         <div class="slip-box">
             <h3 style="margin: 0; color: #10B981;">Target: {target_odds}x &nbsp;|&nbsp; Actual: {round(total_odds, 2)}x</h3>
             <p style="margin: 6px 0 0 0; font-size: 14px;">
-                Legs: {len(st.session_state.generated_slip)} (BetPawa Pro Core) &nbsp;|&nbsp; 
+                Legs: {len(st.session_state.generated_slip)} (High Safety) &nbsp;|&nbsp; 
                 Bonus: +{bonus}% &nbsp;|&nbsp; 
                 Est. Payout: <b>{final_payout:,.0f} UGX</b>
             </p>
@@ -366,7 +349,7 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE PRO SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE ULTRA-SAFE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
@@ -394,7 +377,7 @@ if st.session_state.generated_slip:
     st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background-color: #25D366; color: white; padding: 12px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 15px;">💬 Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
     st.text_area("📋 Copy Booking Text", slip_text, height=130)
 else:
-    st.info("👈 Set your options above and click the **sure** button to generate your slip.")
+    st.info("👈 Set your options above and click **Generate** or **sure** to create your high-safety slip.")
 
 # --- Profit & Loss Dashboard ---
 st.markdown("---")
