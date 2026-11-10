@@ -98,40 +98,6 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- PASSWORD AUTHENTICATION SYSTEM ---
-SECRET_PIN = "7777"
-
-if "authenticated" not in st.session_state:
-  st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-  st.markdown(
-      """
-        <div class="brand-container" style="justify-content: center; margin-top: 40px;">
-            <div class="brand-logo">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-            </div>
-            <div>
-                <h1 class="brand-title">ALPHASTAKE</h1>
-            </div>
-        </div>
-        <p style="text-align: center; color: #c7c4e5; margin-bottom: 30px;">Terminal Locked. Access Restricted.</p>
-    """,
-      unsafe_allow_html=True,
-  )
-
-  input_pin = st.text_input("Enter Access Key / PIN:", type="password")
-  if st.button("Unlock Terminal 🔓"):
-    if input_pin == SECRET_PIN:
-      st.session_state.authenticated = True
-      st.rerun()
-    else:
-      st.error("❌ Invalid Access Key. Access Denied.")
-  st.stop()
-
 # --- Custom Branded Header & Logo ---
 st.markdown(
     """
