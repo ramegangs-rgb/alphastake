@@ -113,7 +113,7 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | High-Precision Strict Risk Filtering.*")
+st.markdown("##### *Elite Analytical AI Engine | Ultra-Safe Strict Risk Filtering.*")
 st.markdown("---")
 
 # --- Whitelist of Core Pro Leagues ---
@@ -179,7 +179,6 @@ def fetch_analyzed_matches():
                                 away_xg = round(random.uniform(0.9, 2.3), 2)
                                 total_projected_xg = home_xg + away_xg
 
-                                # Ultra-Cautious Market Filtering
                                 if away_xg >= home_xg + 0.5:
                                     market = "Double Chance X2"
                                     fair_prob = max(0.75, min(0.88, (away_xg / total_projected_xg)))
@@ -199,7 +198,6 @@ def fetch_analyzed_matches():
                                     analysis = f"Conservative goal buffer. High combined xG ({total_projected_xg}) supports >1.5 goal safety."
                                     trust = round(random.uniform(9.6, 9.9), 1)
                                 else:
-                                    # Skip volatile fixtures completely
                                     continue
 
                                 match_key = f"{home_name} vs {away_name}"
@@ -209,7 +207,6 @@ def fetch_analyzed_matches():
                                     "home_score": home_score,
                                     "away_score": away_score,
                                     "status": status_type,
-                                    "league": matched_league,
                                     "market": market,
                                     "odds": odds,
                                     "trust": trust,
@@ -257,7 +254,7 @@ def record_slip(legs, title, odds, stake, payout):
             "status": "Pending"
         })
 
-# Generation Logic with Strict Cautious Cap
+# Generation Logic
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
         st.warning("⚠️ No fixtures met the strict AI safety threshold (Trust >= 9.6). Check back near kick-off!")
@@ -362,7 +359,7 @@ if st.session_state.generated_slip:
         st.markdown(
             f"""
             <div class="slip-box">
-                <b>Leg {i}: {leg.get('home')} vs {leg.get('away')}</b> ({leg.get('league')})<br>
+                <b>Leg {i}: {leg.get('home')} vs {leg.get('away')}</b><br>
                 Selection: <span class="badge-market">{leg.get('market')}</span> &nbsp; Odds: <b>{leg.get('odds')}</b> &nbsp; <span class="badge-trust">{status_badge}</span><br>
                 <span style="font-size: 12px; color: rgba(247,247,255,0.6);">Model xG Projection: {leg.get('xg')}</span>
                 <div class="analysis-text">💡 <b>AI Logic:</b> {leg.get('analysis')}</div>
