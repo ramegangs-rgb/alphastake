@@ -113,7 +113,7 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | Strict BetPawa Pro Core & P&L Tracker.*")
+st.markdown("##### *Elite Analytical AI Engine | Automatic Auto-Settling P&L Tracker.*")
 st.markdown("---")
 
 # --- Whitelist of Core Pro Leagues ---
@@ -138,7 +138,7 @@ def prob_to_betpawa_odds(probability, margin=0.04, market_boost=1.04):
 
 @st.cache_data(ttl=60)
 def fetch_analyzed_matches():
-    analyzed_matches = []
+    analyzed_matches = {}
     today = datetime.now()
     tomorrow = today + timedelta(days=1)
     dates_to_fetch = [today.strftime("%Y%m%d"), tomorrow.strftime("%Y%m%d")]
@@ -171,8 +171,8 @@ def fetch_analyzed_matches():
                             home_team, away_team = teams[0], teams[1]
                             home_name = home_team.get("team", {}).get("displayName")
                             away_name = away_team.get("team", {}).get("displayName")
-                            home_score = home_team.get("score", "0")
-                            away_score = away_team.get("score", "0")
+                            home_score = int(home_team.get("score", 0))
+                            away_score = int(away_team.get("score", 0))
 
                             if home_name and away_name:
                                 home_xg = round(random.uniform(1.2, 2.7), 2)
@@ -198,10 +198,12 @@ def fetch_analyzed_matches():
                                     analysis = "Statistical lock. Defensive and pressing metrics favor multi-market coverage."
                                     trust = round(random.uniform(9.5, 9.9), 1)
 
-                                analyzed_matches.append({
+                                match_key = f"{home_name} vs {away_name}"
+                                analyzed_matches[match_key] = {
                                     "home": home_name,
                                     "away": away_name,
-                                    "score": f"{home_score} - {away_score}",
+                                    "home_score": home_score,
+                                    "away_score": away_score,
                                     "status": status_type,
                                     "league": matched_league,
                                     "market": market,
@@ -209,13 +211,14 @@ def fetch_analyzed_matches():
                                     "trust": trust,
                                     "xg": f"{home_xg} - {away_xg}",
                                     "analysis": analysis,
-                                })
+                                }
         except Exception:
             continue
 
     return analyzed_matches
 
-MATCH_POOL = fetch_analyzed_matches()
+MATCH_POOL_DICT = fetch_analyzed_matches()
+MATCH_POOL = list(MATCH_POOL_DICT.values())
 
 # --- Main Configuration Interface ---
 st.markdown("### 🎯 Betslip Configuration")
@@ -291,6 +294,51 @@ if sure_clicked:
         payout_calc = total_odds_prod * stake_amount * (1 + min(len(selected_legs)*5, 100)/100)
         record_slip(selected_legs, st.session_state.slip_title, round(total_odds_prod, 2), stake_amount, payout_calc)
 
+# --- Automatic Settlement Engine ---
+for ticket in st.session_state.slip_history:
+    if "status" not in ticket:
+        ticket["status"] = "Pending"
+    if "id" not in ticket:
+        ticket["id"] = 1
+
+    # Only evaluate pending tickets
+    if ticket["status"] == "Pending":
+        all_finished = True
+        ticket_lost = False
+
+        for leg in ticket["legs"]:
+            match_key = f"{leg.get('home')} vs {leg.get('away')}"
+            live_data = MATCH_POOL_DICT.get(match_key)
+
+            if not live_data:
+                all_finished = False
+                continue
+
+            status = live_data.get("status", "Scheduled")
+            is_ft = "Final" in status or "FT" in status
+
+            if not is_ft:
+                all_finished = False
+            else:
+                h_score = live_data.get("home_score", 0)
+                a_score = live_data.get("away_score", 0)
+                market = leg.get("market", "")
+
+                # Evaluate market outcome
+                if "Home Win (1) or Double Chance 1X" in market:
+                    if not (h_score >= a_score):
+                        ticket_lost = True
+                elif "Over 1.5 Match Goals" in market:
+                    if not ((h_score + a_score) > 1.5):
+                        ticket_lost = True
+                elif "Double Chance: 1X or Over 1.5 Goals" in market:
+                    if not (h_score >= a_score or (h_score + a_score) > 1.5):
+                        ticket_lost = True
+
+        # If all matches in the slip are finalized, auto-settle!
+        if all_finished:
+            ticket["status"] = "Lost" if ticket_lost else "Won"
+
 # --- Active Betslip Output ---
 st.markdown("---")
 st.subheader(f"📋 {st.session_state.slip_title}")
@@ -320,9 +368,13 @@ if st.session_state.generated_slip:
 
     slip_text = f"⚡ *ALPHASTAKE PRO SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
-        status = leg.get("status", "Scheduled")
-        score = leg.get("score", "0 - 0")
-        status_badge = f"🟢 LIVE ({score})" if "In Progress" in status or "Half" in status else (f"🏁 FT ({score})" if "Final" in status or "FT" in status else f"⏳ {status}")
+        match_key = f"{leg.get('home')} vs {leg.get('away')}"
+        live_match = MATCH_POOL_DICT.get(match_key, leg)
+        status = live_match.get("status", "Scheduled")
+        h_s = live_match.get("home_score", 0)
+        a_s = live_match.get("away_score", 0)
+        
+        status_badge = f"🟢 LIVE ({h_s} - {a_s})" if "In Progress" in status or "Half" in status else (f"🏁 FT ({h_s} - {a_s})" if "Final" in status or "FT" in status else f"⏳ {status}")
         
         st.markdown(
             f"""
@@ -346,14 +398,7 @@ else:
 
 # --- Profit & Loss Dashboard ---
 st.markdown("---")
-st.subheader("📊 Session P&L Performance Tracker")
-
-# Ensure older session history items safely default to 'Pending' if key is missing
-for ticket in st.session_state.slip_history:
-    if "status" not in ticket:
-        ticket["status"] = "Pending"
-    if "id" not in ticket:
-        ticket["id"] = 1
+st.subheader("📊 Session P&L Performance Tracker (Auto-Settling)")
 
 total_staked = sum(ticket["stake"] for ticket in st.session_state.slip_history)
 total_won = sum(ticket["payout"] for ticket in st.session_state.slip_history if ticket["status"] == "Won")
@@ -366,11 +411,11 @@ roi = (net_pnl / total_staked * 100) if total_staked > 0 else 0.0
 col_p1, col_p2, col_p3 = st.columns(3)
 col_p1.metric("Net Profit / Loss", f"{net_pnl:+,.0f} UGX", delta=f"{roi:.1f}% ROI")
 col_p2.metric("Total Staked", f"{total_staked:,.0f} UGX")
-col_p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len([t for t in settled_tickets if t['status']=='Won'])}/{len(settled_tickets)} Won")
+col_p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len([t for t in settled_tickets if t['status']=='Won'])}/{len(settled_tickets)} Settled")
 
 # --- Interactive Slips History Log ---
 st.markdown("<br>", unsafe_allow_html=True)
-st.subheader("📜 Session Tickets & Result Logger")
+st.subheader("📜 Session Tickets & Auto-Settled Log")
 
 if st.session_state.slip_history:
     if st.button("🗑️ Clear History Log"):
@@ -378,25 +423,15 @@ if st.session_state.slip_history:
         st.rerun()
 
     for idx, past_slip in enumerate(st.session_state.slip_history):
-        with st.expander(f"Ticket #{past_slip['id']} | {past_slip['title']} ({past_slip['odds']}x) — [{past_slip['status']}]"):
+        status_label = past_slip['status']
+        badge_icon = "⏳" if status_label == "Pending" else ("✅" if status_label == "Won" else "❌")
+        
+        with st.expander(f"Ticket #{past_slip['id']} | {past_slip['title']} ({past_slip['odds']}x) — [{badge_icon} {status_label}]"):
             st.markdown(f"**Stake:** {past_slip['stake']:,} UGX | **Est Payout:** **{past_slip['payout']:,.0f} UGX**")
-            
-            btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 2])
-            with btn_col1:
-                if st.button("Mark WIN ✅", key=f"win_{past_slip['id']}_{idx}"):
-                    past_slip["status"] = "Won"
-                    st.rerun()
-            with btn_col2:
-                if st.button("Mark LOSS ❌", key=f"loss_{past_slip['id']}_{idx}"):
-                    past_slip["status"] = "Lost"
-                    st.rerun()
-            with btn_col3:
-                if st.button("Reset Status ⏳", key=f"reset_{past_slip['id']}_{idx}"):
-                    past_slip["status"] = "Pending"
-                    st.rerun()
-
             st.markdown("---")
             for leg_idx, l in enumerate(past_slip["legs"], 1):
-                st.markdown(f"&nbsp;&nbsp;{leg_idx}. **{l.get('home')} vs {l.get('away')}** -> `{l.get('market')}` @ **{l.get('odds')}**")
+                match_key = f"{l.get('home')} vs {l.get('away')}"
+                live_leg = MATCH_POOL_DICT.get(match_key, l)
+                st.markdown(f"&nbsp;&nbsp;{leg_idx}. **{l.get('home')} vs {l.get('away')}** -> `{l.get('market')}` @ **{l.get('odds')}** *(Score: {live_leg.get('home_score', 0)} - {live_leg.get('away_score', 0)})*")
 else:
-    st.caption("No tickets generated yet. Generate a slip above to start tracking P&L!")
+    st.caption("No tickets generated yet. Generate a slip above to start tracking P&L automatically!")
