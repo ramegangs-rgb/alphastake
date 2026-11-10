@@ -247,7 +247,7 @@ def record_slip(legs, title, odds, stake, payout):
             "stake": stake,
             "payout": payout,
             "legs": legs,
-            "status": "Pending"  # Status: Pending, Won, Lost
+            "status": "Pending"
         })
 
 # Generation Actions
@@ -348,9 +348,15 @@ else:
 st.markdown("---")
 st.subheader("📊 Session P&L Performance Tracker")
 
+# Ensure older session history items safely default to 'Pending' if key is missing
+for ticket in st.session_state.slip_history:
+    if "status" not in ticket:
+        ticket["status"] = "Pending"
+    if "id" not in ticket:
+        ticket["id"] = 1
+
 total_staked = sum(ticket["stake"] for ticket in st.session_state.slip_history)
 total_won = sum(ticket["payout"] for ticket in st.session_state.slip_history if ticket["status"] == "Won")
-total_lost = sum(ticket["stake"] for ticket in st.session_state.slip_history if ticket["status"] == "Lost")
 net_pnl = total_won - total_staked
 
 settled_tickets = [t for t in st.session_state.slip_history if t["status"] in ["Won", "Lost"]]
@@ -372,22 +378,20 @@ if st.session_state.slip_history:
         st.rerun()
 
     for idx, past_slip in enumerate(st.session_state.slip_history):
-        status_color = "#10B981" if past_slip["status"] == "Won" else ("#EF4444" if past_slip["status"] == "Lost" else "#F59E0B")
         with st.expander(f"Ticket #{past_slip['id']} | {past_slip['title']} ({past_slip['odds']}x) — [{past_slip['status']}]"):
             st.markdown(f"**Stake:** {past_slip['stake']:,} UGX | **Est Payout:** **{past_slip['payout']:,.0f} UGX**")
             
-            # Settlement Buttons inside Expander
             btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 2])
             with btn_col1:
-                if st.button("Mark WIN ✅", key=f"win_{past_slip['id']}"):
+                if st.button("Mark WIN ✅", key=f"win_{past_slip['id']}_{idx}"):
                     past_slip["status"] = "Won"
                     st.rerun()
             with btn_col2:
-                if st.button("Mark LOSS ❌", key=f"loss_{past_slip['id']}"):
+                if st.button("Mark LOSS ❌", key=f"loss_{past_slip['id']}_{idx}"):
                     past_slip["status"] = "Lost"
                     st.rerun()
             with btn_col3:
-                if st.button("Reset Status ⏳", key=f"reset_{past_slip['id']}"):
+                if st.button("Reset Status ⏳", key=f"reset_{past_slip['id']}_{idx}"):
                     past_slip["status"] = "Pending"
                     st.rerun()
 
@@ -395,6 +399,4 @@ if st.session_state.slip_history:
             for leg_idx, l in enumerate(past_slip["legs"], 1):
                 st.markdown(f"&nbsp;&nbsp;{leg_idx}. **{l.get('home')} vs {l.get('away')}** -> `{l.get('market')}` @ **{l.get('odds')}**")
 else:
-  st.caption(
-      "No tickets generated yet. Generate a slip above to start tracking P&L!"
-  )
+    st.caption("No tickets generated yet. Generate a slip above to start tracking P&L!")
