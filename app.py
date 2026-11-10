@@ -115,22 +115,22 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    "##### *Elite Analytical AI Engine | BetPawa Core Leagues & History.*"
+    "##### *Elite Analytical AI Engine | Strict BetPawa Pro Core Only.*"
 )
 st.markdown("---")
 
-# --- BetPawa Primary Supported Leagues Filter List ---
-BETPAWA_LEAGUES = [
-    "English Premier League",
-    "Spanish La Liga",
-    "Italian Serie A",
-    "German Bundesliga",
-    "French Ligue 1",
-    "UEFA Champions League",
-    "UEFA Europa League",
-    "English Championship",
-    "CAF Champions League",
-]
+# --- Strict BetPawa Core Professional Leagues Whitelist ---
+STRICT_BETPAWA_LEAGUES = {
+    "eng.1": "English Premier League",
+    "eng.2": "English Championship",
+    "esp.1": "Spanish La Liga",
+    "ita.1": "Italian Serie A",
+    "ger.1": "German Bundesliga",
+    "fra.1": "French Ligue 1",
+    "uefa.champions": "UEFA Champions League",
+    "uefa.europa": "UEFA Europa League",
+    "caf.champions": "CAF Champions League",
+}
 
 
 # --- Fine-Tuned betPawa Odds Calibration Engine ---
@@ -142,7 +142,7 @@ def prob_to_betpawa_odds(probability, margin=0.04, market_boost=1.04):
   return max(round(raw_odds, 2), 1.08)
 
 
-# --- Global Soccer Match Fetcher filtered for BetPawa Leagues ---
+# --- Strict Pro Match Fetcher (Excludes College/Amateur Feeds) ---
 @st.cache_data(ttl=60)
 def fetch_analyzed_matches():
   analyzed_matches = []
@@ -157,24 +157,32 @@ def fetch_analyzed_matches():
       if res.status_code == 200:
         events = res.json().get("events", [])
         for event in events:
-          league_slug = event.get("season", {}).get("slug", "")
-          league_name = league_slug.replace("-", " ").title()
+          league_obj = event.get("season", {})
+          league_slug = league_obj.get("slug", "").lower()
+          league_name = league_slug.replace("-", ".").lower()
 
-          # Filter check to match core professional leagues
+          # Strict Whitelist Check: Must match exact pro keys or known pro names
           matched_league = None
-          for b_league in BETPAWA_LEAGUES:
-            if (
-                any(
-                    word.lower() in league_name.lower()
-                    for word in b_league.split()[-2:]
-                )
-                or b_league.lower() in league_name.lower()
+          for key, lname in STRICT_BETPAWA_LEAGUES.items():
+            if key in league_name or any(
+                term in league_name for term in key.split(".")
             ):
-              matched_league = b_league
+              matched_league = lname
               break
 
-          # If it doesn't match core betpawa major leagues, we skip it
-          if not matched_league:
+          # Explicitly block collegiate, amateur, or high school terms
+          if not matched_league or any(
+              term in league_name
+              for term in [
+                  "college",
+                  "ncaa",
+                  "women",
+                  "ncaa.m",
+                  "ncaa.w",
+                  "high-school",
+                  "friendly",
+              ]
+          ):
             continue
 
           status_type = (
@@ -306,7 +314,7 @@ if generate_clicked:
   if not MATCH_POOL:
     st.warning(
         "⚠️ No active fixtures found in core BetPawa leagues right now."
-        " Try again closer to matchdays!"
+        " Try again on matchdays!"
     )
   else:
     shuffled = MATCH_POOL.copy()
@@ -320,9 +328,7 @@ if generate_clicked:
         current_prod *= match["odds"]
 
     st.session_state.generated_slip = selected_legs
-    st.session_state.slip_title = (
-        "AI Optimized Betslip (BetPawa Leagues Core)"
-    )
+    st.session_state.slip_title = "AI Optimized Betslip (BetPawa Pro Core)"
 
     total_odds_prod = 1.0
     for l in selected_legs:
@@ -344,7 +350,7 @@ if sure_clicked:
   if not MATCH_POOL:
     st.warning(
         "⚠️ No active fixtures found in core BetPawa leagues right now."
-        " Try again closer to matchdays!"
+        " Try again on matchdays!"
     )
   else:
     high_confidence_pool = [m for m in MATCH_POOL if m["trust"] >= 9.5]
@@ -362,7 +368,7 @@ if sure_clicked:
 
     st.session_state.generated_slip = selected_legs
     st.session_state.slip_title = (
-        "🔥 BETPAWA ELITE SURE SLIP (3-Leg Core Cap)"
+        "🔥 BETPAWA ELITE SURE SLIP (3-Leg Pro Cap)"
     )
 
     total_odds_prod = 1.0
@@ -398,7 +404,7 @@ if st.session_state.generated_slip:
         <div class="slip-box">
             <h3 style="margin: 0; color: #10B981;">Target: {target_odds}x &nbsp;|&nbsp; Actual: {round(total_odds, 2)}x</h3>
             <p style="margin: 6px 0 0 0; font-size: 14px;">
-                Legs: {len(st.session_state.generated_slip)} (BetPawa Core) &nbsp;|&nbsp; 
+                Legs: {len(st.session_state.generated_slip)} (BetPawa Pro Core) &nbsp;|&nbsp; 
                 Bonus: +{bonus}% &nbsp;|&nbsp; 
                 Est. Payout: <b>{final_payout:,.0f} UGX</b>
             </p>
@@ -408,7 +414,7 @@ if st.session_state.generated_slip:
   )
 
   slip_text = (
-      f"⚡ *ALPHASTAKE BETPAWA SLIP* ⚡\nTarget: {target_odds}x | Actual:"
+      f"⚡ *ALPHASTAKE PRO SLIP* ⚡\nTarget: {target_odds}x | Actual:"
       f" {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return:"
       f" {final_payout:,.0f} UGX\n"
       + "-" * 30
@@ -467,7 +473,7 @@ if st.session_state.generated_slip:
 else:
   st.info(
       "👈 Set your options above and click the **sure** button to generate"
-      " your slip from BetPawa core leagues."
+      " your professional BetPawa slip."
   )
 
 # --- Past Slips History Log Section ---
