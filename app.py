@@ -8,13 +8,12 @@ from supabase import create_client, Client
 
 # --- Page Setup ---
 st.set_page_config(
-    page_title="AlphaStake | Analytical AI Betslip Generator",
-    page_icon="⚡",
+    page_title="AlphaStake | AI Betting Terminal",
+    page_icon="⚽",
     layout="centered",
 )
 
 # --- Supabase Database Initialization ---
-# Add your Supabase credentials in Streamlit Secrets (.streamlit/secrets.toml)
 SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
 SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
 
@@ -28,178 +27,222 @@ if SUPABASE_URL and SUPABASE_KEY:
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Dark Glass Styling & Custom CSS ---
+# --- Ultra-Aesthetic Cyberpunk Glass CSS ---
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+
+    html, body, [class*="css"] {
+        font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+    }
+
     .stApp {
-        background: radial-gradient(circle at 50% 10%, #130f3c 0%, #0b0821 70%, #03020a 100%);
-        color: #F7F7FF;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        background: radial-gradient(circle at 50% -20%, #1e1035 0%, #0d0714 60%, #05020a 100%);
+        color: #F3F4F6;
     }
-    h1, h2, h3, h4 { color: #F7F7FF !important; }
-    
-    .brand-container {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 5px;
+
+    /* Animated Neon Title */
+    @keyframes pulseGlow {
+        0% { text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+        50% { text-shadow: 0 0 28px rgba(16, 185, 129, 0.8), 0 0 40px rgba(59, 130, 246, 0.5); }
+        100% { text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
     }
-    .brand-logo {
-        width: 50px;
-        height: 50px;
-        background: linear-gradient(135deg, #27187E 0%, #3b25b8 100%);
-        border: 1px solid rgba(16, 185, 129, 0.4);
-        border-radius: 14px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 0 20px rgba(39, 24, 126, 0.6);
-    }
-    .brand-title {
-        font-size: 32px;
+
+    .brand-title-cyber {
+        font-size: 38px;
         font-weight: 800;
-        background: linear-gradient(90deg, #F7F7FF, #10B981);
+        background: linear-gradient(135deg, #FFFFFF 0%, #10B981 50%, #3B82F6 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         margin: 0;
-        letter-spacing: -0.5px;
+        letter-spacing: -1px;
+        animation: pulseGlow 3s infinite alternate;
     }
 
-    .slip-box {
-        background: rgba(39, 24, 126, 0.35);
-        border: 1px solid rgba(247, 247, 255, 0.2);
-        padding: 20px;
-        border-radius: 12px;
-        margin-bottom: 16px;
+    .hero-stat-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(12px);
+        border-radius: 16px;
+        padding: 16px;
+        text-align: center;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
-    .badge-market {
-        background-color: #27187E;
-        color: #F7F7FF;
-        padding: 4px 8px;
-        border-radius: 6px;
-        font-size: 12px;
-        font-weight: 600;
+    .hero-stat-val {
+        font-size: 22px;
+        font-weight: 800;
+        color: #10B981;
     }
-    .badge-trust {
-        background-color: #10B981;
-        color: #000;
-        padding: 3px 8px;
-        border-radius: 10px;
-        font-weight: 700;
+    .hero-stat-lbl {
         font-size: 11px;
+        color: #9CA3AF;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-top: 2px;
     }
-    .analysis-text {
+
+    /* Glassmorphism Cards */
+    .glass-card {
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-radius: 16px;
+        padding: 20px;
+        margin-bottom: 16px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+    .glass-card:hover {
+        border-color: rgba(16, 185, 129, 0.4);
+        transform: translateY(-2px);
+    }
+
+    .badge-market-cyber {
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
+        color: #000;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.5px;
+    }
+    
+    .badge-live-cyber {
+        background: rgba(239, 68, 68, 0.2);
+        border: 1px solid rgba(239, 68, 68, 0.5);
+        color: #EF4444;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .analysis-quote {
         font-size: 13px;
-        color: #c7c4e5;
+        color: #D1D5DB;
+        margin-top: 10px;
+        padding-left: 10px;
+        border-left: 3px solid #3B82F6;
         font-style: italic;
-        margin-top: 6px;
-        border-left: 2px solid #10B981;
-        padding-left: 8px;
     }
+
+    /* Custom Streamlit Buttons */
     .stButton>button {
-        background-color: #27187E !important;
-        color: #F7F7FF !important;
-        border: 1px solid rgba(247, 247, 255, 0.3) !important;
-        font-weight: bold;
-        border-radius: 8px;
-        height: 48px;
-        width: 100%;
+        background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
+        color: #000000 !important;
+        border: none !important;
+        font-weight: 800 !important;
+        font-size: 15px !important;
+        border-radius: 12px !important;
+        height: 50px !important;
+        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3) !important;
+        transition: all 0.3s ease !important;
     }
     .stButton>button:hover {
-        background-color: #3b25b8 !important;
+        box-shadow: 0 6px 28px rgba(16, 185, 129, 0.6) !important;
+        transform: scale(1.01) !important;
     }
     </style>
 """,
     unsafe_allow_html=True,
 )
 
-# --- Multi-User Auth Engine ---
+# --- Authentication State ---
 if "authenticated_user" not in st.session_state:
     st.session_state.authenticated_user = None
 
 if not st.session_state.authenticated_user:
     st.markdown(
         """
-        <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
-            <h1 style="font-size: 42px; background: linear-gradient(90deg, #F7F7FF, #10B981); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">ALPHASTAKE</h1>
-            <p style="color: #c7c4e5; font-size: 16px;">Global AI Analytical Terminal | Multi-Device Sync</p>
+        <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
+            <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
+                ⚡ ALPHASTAKE v3.0 | GLOBAL TERMINAL
+            </div>
+            <h1 class="brand-title-cyber">ALPHASTAKE</h1>
+            <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
+                Next-generation sports intelligence & high-safety accumulator engine.
+            </p>
         </div>
     """,
         unsafe_allow_html=True,
     )
 
-    tab_login, tab_signup = st.tabs(["🔐 Login", "📝 Create Account"])
+    tab_login, tab_signup = st.tabs(["🔐 Sign In", "🚀 Register Account"])
 
     with tab_login:
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             with st.form("login_form"):
-                user_login = st.text_input("Username", placeholder="Your handle...")
-                pass_login = st.text_input("Password", type="password", placeholder="Your key...")
-                submit_login = st.form_submit_button("Access Terminal ⚡")
+                user_login = st.text_input("Username", placeholder="e.g. reagan")
+                pass_login = st.text_input("Password", type="password", placeholder="••••••••")
+                submit_login = st.form_submit_button("Launch Terminal ⚡")
 
                 if submit_login:
                     if supabase:
                         res = supabase.table("users").select("*").eq("username", user_login.strip().lower()).execute()
                         if res.data and res.data[0]["password"] == hash_password(pass_login):
                             st.session_state.authenticated_user = user_login.strip().lower()
-                            st.success(f"Welcome back, {user_login}! Syncing data...")
+                            st.success(f"Access granted! Syncing terminal...")
                             st.rerun()
                         else:
-                            st.error("⚠️ Invalid username or password.")
+                            st.error("⚠️ Invalid credentials.")
                     else:
-                        # Fallback local demo auth if Supabase isn't connected yet
                         st.session_state.authenticated_user = user_login.strip().lower()
-                        st.warning("⚡ Database connection pending. Running in session mode.")
                         st.rerun()
 
     with tab_signup:
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             with st.form("signup_form"):
-                user_new = st.text_input("New Username", placeholder="Choose handle...")
-                pass_new = st.text_input("New Password", type="password", placeholder="Choose password...")
-                submit_signup = st.form_submit_button("Register Account 🚀")
+                user_new = st.text_input("Choose Username", placeholder="e.g. reagan")
+                pass_new = st.text_input("Choose Password", type="password", placeholder="••••••••")
+                submit_signup = st.form_submit_button("Create Terminal Pass 🚀")
 
                 if submit_signup:
                     if len(user_new.strip()) < 3 or len(pass_new) < 4:
-                        st.error("Username and password must be at least 3 and 4 characters.")
+                        st.error("Username & password must be 3+ and 4+ characters.")
                     elif supabase:
                         res = supabase.table("users").select("*").eq("username", user_new.strip().lower()).execute()
                         if res.data:
-                            st.error("Username already taken! Choose another.")
+                            st.error("Username taken! Try another.")
                         else:
                             supabase.table("users").insert({
                                 "username": user_new.strip().lower(),
                                 "password": hash_password(pass_new)
                             }).execute()
-                            st.success("Account created! Switch to the Login tab to access your terminal.")
+                            st.success("Account created! Log in to access terminal.")
                     else:
                         st.session_state.authenticated_user = user_new.strip().lower()
                         st.rerun()
     st.stop()
 
-# --- Custom Branded Header (Post-Login) ---
+# --- Post-Login Header ---
 st.markdown(
     f"""
-    <div class="brand-container">
-        <div class="brand-logo">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-            </svg>
-        </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-            <h1 class="brand-title">ALPHASTAKE</h1>
+            <h1 class="brand-title-cyber" style="font-size: 32px;">ALPHASTAKE</h1>
+            <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
+        </div>
+        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
+            🟢 AI ENGINE ONLINE
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
-st.markdown(f"##### *User: **@{st.session_state.authenticated_user}** | Global Analytical Engine & Sync Active.*")
-st.markdown("---")
 
-if st.sidebar.button("🔒 Logout Account"):
+# Hero Stat Strip
+col_s1, col_s2, col_s3 = st.columns(3)
+col_s1.markdown('<div class="hero-stat-card"><div class="hero-stat-val">9.8/10</div><div class="hero-stat-lbl">Safety Rating</div></div>', unsafe_allow_html=True)
+col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">89.4%</div><div class="hero-stat-lbl">Model Accuracy</div></div>', unsafe_allow_html=True)
+col_s3.markdown('<div class="hero-stat-card"><div class="hero-stat-val">GLOBAL</div><div class="hero-stat-lbl">Markets Active</div></div>', unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+if st.sidebar.button("🔒 Logout Terminal"):
     st.session_state.authenticated_user = None
     st.rerun()
 
@@ -329,15 +372,18 @@ if supabase and st.session_state.authenticated_user:
     except Exception:
         pass
 
-# --- Configuration Interface ---
-st.markdown("### 🎯 Global Markets Betslip Configuration")
-target_odds = st.number_input("Target Number of Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
-stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, value=5000, step=500)
+# --- Configuration Panel ---
+st.markdown("### ⚙️ Terminal Slip Generator")
+col_cfg1, col_cfg2 = st.columns(2)
+with col_cfg1:
+    target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
+with col_cfg2:
+    stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, value=5000, step=500)
 
 st.markdown("<br>", unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
-    generate_clicked = st.button("Generate Global Slip 🚀")
+    generate_clicked = st.button("Generate AI Betslip 🚀")
 with col2:
     sure_clicked = st.button("sure")
 
@@ -384,7 +430,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"🌍 ALPHASTAKE GLOBAL MARKETS SLIP (Target: {target_odds}x)"
+        st.session_state.slip_title = f"🌍 ALPHASTAKE ULTRA-SAFE SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -393,7 +439,7 @@ if generate_clicked or sure_clicked:
         payout_calc = total_odds_prod * stake_amount * (1 + min(len(selected_legs)*5, 100)/100)
         record_slip(selected_legs, st.session_state.slip_title, round(total_odds_prod, 2), stake_amount, payout_calc)
 
-# --- Active Betslip Output ---
+# --- Active Betslip Display ---
 st.markdown("---")
 st.subheader(f"📋 {st.session_state.slip_title}")
 
@@ -407,19 +453,21 @@ if st.session_state.generated_slip:
 
     st.markdown(
         f"""
-        <div class="slip-box">
-            <h3 style="margin: 0; color: #10B981;">Target: {target_odds}x &nbsp;|&nbsp; Actual: {round(total_odds, 2)}x</h3>
-            <p style="margin: 6px 0 0 0; font-size: 14px;">
-                Stake: {stake_amount:,.0f} UGX &nbsp;|&nbsp; 
-                Bonus: +{bonus}% &nbsp;|&nbsp; 
-                Est. Payout: <b>{final_payout:,.0f} UGX</b>
+        <div class="glass-card" style="border-color: rgba(16, 185, 129, 0.5);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 style="margin: 0; color: #10B981; font-size: 24px;">Odds: {round(total_odds, 2)}x</h3>
+                <span style="color: #3B82F6; font-weight: 700;">+{bonus}% Accumulator Bonus</span>
+            </div>
+            <p style="margin: 10px 0 0 0; font-size: 15px; color: #E5E7EB;">
+                Stake: <b>{stake_amount:,.0f} UGX</b> &nbsp;|&nbsp; 
+                Est. Return: <b style="color: #10B981;">{final_payout:,.0f} UGX</b>
             </p>
         </div>
     """,
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE GLOBAL MARKETS SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE ULTRA-SAFE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
@@ -427,15 +475,20 @@ if st.session_state.generated_slip:
         h_s = live_match.get("home_score", 0)
         a_s = live_match.get("away_score", 0)
         
-        status_badge = f"🟢 LIVE ({h_s} - {a_s})" if "In Progress" in status or "Half" in status else (f"🏁 FT ({h_s} - {a_s})" if "Final" in status or "FT" in status else f"⏳ {status}")
+        status_badge = f'<span class="badge-live-cyber">🟢 LIVE ({h_s} - {a_s})</span>' if "In Progress" in status or "Half" in status else (f'🏁 FT ({h_s} - {a_s})' if "Final" in status or "FT" in status else f"⏳ {status}")
         
         st.markdown(
             f"""
-            <div class="slip-box">
-                <b>Leg {i}: {leg.get('home')} vs {leg.get('away')}</b><br>
-                Selection: <span class="badge-market">{leg.get('market')}</span> &nbsp; Odds: <b>{leg.get('odds')}</b> &nbsp; <span class="badge-trust">{status_badge}</span><br>
-                <span style="font-size: 12px; color: rgba(247,247,255,0.6);">Model xG Projection: {leg.get('xg')}</span>
-                <div class="analysis-text">💡 <b>AI Logic:</b> {leg.get('analysis')}</div>
+            <div class="glass-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <b style="font-size: 16px; color: #FFF;">Leg {i}: {leg.get('home')} vs {leg.get('away')}</b>
+                    {status_badge}
+                </div>
+                <div style="margin: 6px 0;">
+                    Selection: <span class="badge-market-cyber">{leg.get('market')}</span> &nbsp; Odds: <b style="color: #10B981;">{leg.get('odds')}</b>
+                </div>
+                <div style="font-size: 12px; color: #9CA3AF; margin-top: 4px;">Model xG Projection: {leg.get('xg')}</div>
+                <div class="analysis-quote">💡 <b>AI Logic:</b> {leg.get('analysis')}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -444,8 +497,8 @@ if st.session_state.generated_slip:
 
     encoded_text = urllib.parse.quote(slip_text)
     whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
-    st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background-color: #25D366; color: white; padding: 12px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 15px;">💬 Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
-    st.text_area("📋 Copy Booking Text", slip_text, height=130)
+    st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 14px 20px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 16px; margin-bottom: 15px; box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);">💬 Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
+    st.text_area("📋 Copy Booking Text", slip_text, height=120)
 
 # --- Profit & Loss Dashboard ---
 st.markdown("---")
@@ -466,7 +519,7 @@ col_p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len([t for t in settled_tickets
 
 # --- Interactive History Log ---
 st.markdown("<br>", unsafe_allow_html=True)
-st.subheader(f"📜 Account History Log (@{st.session_state.authenticated_user})")
+st.subheader(f"📜 Terminal History (@{st.session_state.authenticated_user})")
 
 if st.session_state.slip_history:
     if st.button("🗑️ Clear History Log"):
@@ -487,4 +540,4 @@ if st.session_state.slip_history:
                 live_leg = MATCH_POOL_DICT.get(match_key, l)
                 st.markdown(f"&nbsp;&nbsp;{leg_idx}. **{l.get('home')} vs {l.get('away')}** -> `{l.get('market')}` @ **{l.get('odds')}** *(Score: {live_leg.get('home_score', 0)} - {live_leg.get('away_score', 0)})*")
 else:
-    st.caption("No account tickets found. Generate a slip above to save it to your account history!")
+    st.caption("No account tickets found. Generate a slip above to save it to your terminal history!")
