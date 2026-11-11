@@ -113,7 +113,7 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | Kelly Staking & Compounding Tracker.*")
+st.markdown("##### *Elite Analytical AI Engine | Kelly Staking & Corrected P&L.*")
 st.markdown("---")
 
 # --- Sidebar: Kelly Staking & 10-Day Compounding Challenge ---
@@ -494,17 +494,18 @@ else:
       " **sure** to calculate your Kelly optimal stake."
   )
 
-# --- Profit & Loss Dashboard ---
+# --- Profit & Loss Dashboard (Fixed Net Profit Accounting) ---
 st.markdown("---")
 st.subheader("📊 Session P&L Performance Tracker (Auto-Settling)")
 
 total_staked = sum(ticket["stake"] for ticket in st.session_state.slip_history)
-total_won = sum(
+# Corrected: Net profit is (Payout - Stake) for won tickets, minus total stakes for lost ones
+total_won_payouts = sum(
     ticket["payout"]
     for ticket in st.session_state.slip_history
     if ticket["status"] == "Won"
 )
-net_pnl = total_won - total_staked
+net_pnl = total_won_payouts - total_staked
 
 settled_tickets = [
     t for t in st.session_state.slip_history if t["status"] in ["Won", "Lost"]
