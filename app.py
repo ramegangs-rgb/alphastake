@@ -1,8 +1,10 @@
 from datetime import datetime, timedelta
+import hashlib
 import random
 import requests
 import streamlit as st
 import urllib.parse
+from supabase import create_client, Client
 
 # --- Page Setup ---
 st.set_page_config(
@@ -10,6 +12,21 @@ st.set_page_config(
     page_icon="⚡",
     layout="centered",
 )
+
+# --- Supabase Database Initialization ---
+# Add your Supabase credentials in Streamlit Secrets (.streamlit/secrets.toml)
+SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception:
+        pass
+
+def hash_password(password):
+    return hashlib.sha256(str.encode(password)).hexdigest()
 
 # --- Dark Glass Styling & Custom CSS ---
 st.markdown(
@@ -97,9 +114,75 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- Custom Branded Header ---
+# --- Multi-User Auth Engine ---
+if "authenticated_user" not in st.session_state:
+    st.session_state.authenticated_user = None
+
+if not st.session_state.authenticated_user:
+    st.markdown(
+        """
+        <div style="text-align: center; margin-top: 40px; margin-bottom: 20px;">
+            <h1 style="font-size: 42px; background: linear-gradient(90deg, #F7F7FF, #10B981); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">ALPHASTAKE</h1>
+            <p style="color: #c7c4e5; font-size: 16px;">Global AI Analytical Terminal | Multi-Device Sync</p>
+        </div>
+    """,
+        unsafe_allow_html=True,
+    )
+
+    tab_login, tab_signup = st.tabs(["🔐 Login", "📝 Create Account"])
+
+    with tab_login:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            with st.form("login_form"):
+                user_login = st.text_input("Username", placeholder="Your handle...")
+                pass_login = st.text_input("Password", type="password", placeholder="Your key...")
+                submit_login = st.form_submit_button("Access Terminal ⚡")
+
+                if submit_login:
+                    if supabase:
+                        res = supabase.table("users").select("*").eq("username", user_login.strip().lower()).execute()
+                        if res.data and res.data[0]["password"] == hash_password(pass_login):
+                            st.session_state.authenticated_user = user_login.strip().lower()
+                            st.success(f"Welcome back, {user_login}! Syncing data...")
+                            st.rerun()
+                        else:
+                            st.error("⚠️ Invalid username or password.")
+                    else:
+                        # Fallback local demo auth if Supabase isn't connected yet
+                        st.session_state.authenticated_user = user_login.strip().lower()
+                        st.warning("⚡ Database connection pending. Running in session mode.")
+                        st.rerun()
+
+    with tab_signup:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            with st.form("signup_form"):
+                user_new = st.text_input("New Username", placeholder="Choose handle...")
+                pass_new = st.text_input("New Password", type="password", placeholder="Choose password...")
+                submit_signup = st.form_submit_button("Register Account 🚀")
+
+                if submit_signup:
+                    if len(user_new.strip()) < 3 or len(pass_new) < 4:
+                        st.error("Username and password must be at least 3 and 4 characters.")
+                    elif supabase:
+                        res = supabase.table("users").select("*").eq("username", user_new.strip().lower()).execute()
+                        if res.data:
+                            st.error("Username already taken! Choose another.")
+                        else:
+                            supabase.table("users").insert({
+                                "username": user_new.strip().lower(),
+                                "password": hash_password(pass_new)
+                            }).execute()
+                            st.success("Account created! Switch to the Login tab to access your terminal.")
+                    else:
+                        st.session_state.authenticated_user = user_new.strip().lower()
+                        st.rerun()
+    st.stop()
+
+# --- Custom Branded Header (Post-Login) ---
 st.markdown(
-    """
+    f"""
     <div class="brand-container">
         <div class="brand-logo">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -113,8 +196,12 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | Global Markets & Auto P&L.*")
+st.markdown(f"##### *User: **@{st.session_state.authenticated_user}** | Global Analytical Engine & Sync Active.*")
 st.markdown("---")
+
+if st.sidebar.button("🔒 Logout Account"):
+    st.session_state.authenticated_user = None
+    st.rerun()
 
 # --- Whitelist of Core Pro Leagues ---
 STRICT_BETPAWA_LEAGUES = {
@@ -131,8 +218,7 @@ STRICT_BETPAWA_LEAGUES = {
 }
 
 def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.02):
-    if probability <= 0:
-        return 99.00
+    if probability <= 0: return 99.00
     adjusted_prob = probability * (1 + margin)
     raw_odds = (1 / adjusted_prob) * market_boost
     return max(min(round(raw_odds, 2), 1.55), 1.12)
@@ -180,16 +266,10 @@ def fetch_analyzed_matches():
                                 away_xg = round(random.uniform(0.9, 2.4), 2)
                                 total_projected_xg = home_xg + away_xg
 
-                                # Global Market Expansion Engine
                                 market_roll = random.choice([
-                                    "Double Chance X2",
-                                    "Double Chance 1X",
-                                    "Over 1.5 Match Goals",
-                                    "Both Teams to Score (BTTS - Yes)",
-                                    "Draw No Bet (Home)",
-                                    "Draw No Bet (Away)",
-                                    "Total Goals Under 3.5",
-                                    "Home Team Over 0.5 Goals"
+                                    "Double Chance X2", "Double Chance 1X", "Over 1.5 Match Goals",
+                                    "Both Teams to Score (BTTS - Yes)", "Draw No Bet (Home)",
+                                    "Draw No Bet (Away)", "Home Team Over 0.5 Goals"
                                 ])
 
                                 if market_roll == "Double Chance X2" and away_xg >= home_xg - 0.2:
@@ -204,14 +284,6 @@ def fetch_analyzed_matches():
                                     market = "Both Teams to Score (BTTS - Yes)"
                                     fair_prob = 0.74
                                     analysis = f"High offensive output from both camps (Combined xG: {total_projected_xg})."
-                                elif market_roll == "Draw No Bet (Home)" and home_xg > away_xg:
-                                    market = "Draw No Bet (Home)"
-                                    fair_prob = 0.72
-                                    analysis = f"Home superiority indexes favor DNB protection."
-                                elif market_roll == "Draw No Bet (Away)" and away_xg > home_xg:
-                                    market = "Draw No Bet (Away)"
-                                    fair_prob = 0.72
-                                    analysis = f"Visitor momentum indexes favor away DNB coverage."
                                 elif market_roll == "Home Team Over 0.5 Goals":
                                     market = "Home Team Over 0.5 Goals"
                                     fair_prob = 0.82
@@ -245,7 +317,19 @@ def fetch_analyzed_matches():
 MATCH_POOL_DICT = fetch_analyzed_matches()
 MATCH_POOL = list(MATCH_POOL_DICT.values())
 
-# --- Main Configuration Interface ---
+# --- Persistent Account History Loader ---
+if "slip_history" not in st.session_state:
+    st.session_state.slip_history = []
+
+if supabase and st.session_state.authenticated_user:
+    try:
+        saved_db_slips = supabase.table("user_tickets").select("*").eq("username", st.session_state.authenticated_user).order("created_at", desc=True).execute()
+        if saved_db_slips.data:
+            st.session_state.slip_history = [s["ticket_data"] for s in saved_db_slips.data]
+    except Exception:
+        pass
+
+# --- Configuration Interface ---
 st.markdown("### 🎯 Global Markets Betslip Configuration")
 target_odds = st.number_input("Target Number of Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
 stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, value=5000, step=500)
@@ -261,22 +345,29 @@ if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
     st.session_state.slip_title = "AI Global Markets Betslip"
-if "slip_history" not in st.session_state:
-    st.session_state.slip_history = []
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
-    if not st.session_state.slip_history or st.session_state.slip_history[0]["legs"] != legs:
-        st.session_state.slip_history.insert(0, {
-            "id": len(st.session_state.slip_history) + 1,
-            "time": timestamp,
-            "title": title,
-            "odds": odds,
-            "stake": stake,
-            "payout": payout,
-            "legs": legs,
-            "status": "Pending"
-        })
+    ticket_payload = {
+        "id": len(st.session_state.slip_history) + 1,
+        "time": timestamp,
+        "title": title,
+        "odds": odds,
+        "stake": stake,
+        "payout": payout,
+        "legs": legs,
+        "status": "Pending"
+    }
+    st.session_state.slip_history.insert(0, ticket_payload)
+
+    if supabase and st.session_state.authenticated_user:
+        try:
+            supabase.table("user_tickets").insert({
+                "username": st.session_state.authenticated_user,
+                "ticket_data": ticket_payload
+            }).execute()
+        except Exception:
+            pass
 
 # Generation Logic
 if generate_clicked or sure_clicked:
@@ -301,53 +392,6 @@ if generate_clicked or sure_clicked:
 
         payout_calc = total_odds_prod * stake_amount * (1 + min(len(selected_legs)*5, 100)/100)
         record_slip(selected_legs, st.session_state.slip_title, round(total_odds_prod, 2), stake_amount, payout_calc)
-
-# --- Automatic Settlement Engine ---
-for ticket in st.session_state.slip_history:
-    if "status" not in ticket:
-        ticket["status"] = "Pending"
-    if "id" not in ticket:
-        ticket["id"] = 1
-
-    if ticket["status"] == "Pending":
-        all_finished = True
-        ticket_lost = False
-
-        for leg in ticket["legs"]:
-            match_key = f"{leg.get('home')} vs {leg.get('away')}"
-            live_data = MATCH_POOL_DICT.get(match_key)
-
-            if not live_data:
-                all_finished = False
-                continue
-
-            status = live_data.get("status", "Scheduled")
-            is_ft = "Final" in status or "FT" in status
-
-            if not is_ft:
-                all_finished = False
-            else:
-                h_score = live_data.get("home_score", 0)
-                a_score = live_data.get("away_score", 0)
-                market = leg.get("market", "")
-
-                if "Double Chance X2" in market:
-                    if not (a_score >= h_score): ticket_lost = True
-                elif "Double Chance 1X" in market:
-                    if not (h_score >= a_score): ticket_lost = True
-                elif "Over 1.5 Match Goals" in market:
-                    if not ((h_score + a_score) > 1.5): ticket_lost = True
-                elif "Both Teams to Score (BTTS - Yes)" in market:
-                    if not (h_score > 0 and a_score > 0): ticket_lost = True
-                elif "Home Team Over 0.5 Goals" in market:
-                    if not (h_score > 0): ticket_lost = True
-                elif "Draw No Bet (Home)" in market:
-                    if h_score < a_score: ticket_lost = True
-                elif "Draw No Bet (Away)" in market:
-                    if a_score < h_score: ticket_lost = True
-
-        if all_finished:
-            ticket["status"] = "Lost" if ticket_lost else "Won"
 
 # --- Active Betslip Output ---
 st.markdown("---")
@@ -402,12 +446,10 @@ if st.session_state.generated_slip:
     whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
     st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background-color: #25D366; color: white; padding: 12px 20px; border-radius: 8px; text-align: center; font-weight: bold; font-size: 16px; margin-bottom: 15px;">💬 Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
     st.text_area("📋 Copy Booking Text", slip_text, height=130)
-else:
-    st.info("👈 Set your target odds and stake above and click **Generate** or **sure**.")
 
 # --- Profit & Loss Dashboard ---
 st.markdown("---")
-st.subheader("📊 Session P&L Performance Tracker (Auto-Settling)")
+st.subheader("📊 Session P&L Performance Tracker")
 
 total_staked = sum(ticket["stake"] for ticket in st.session_state.slip_history)
 total_won_payouts = sum(ticket["payout"] for ticket in st.session_state.slip_history if ticket["status"] == "Won")
@@ -422,13 +464,15 @@ col_p1.metric("Net Profit / Loss", f"{net_pnl:+,.0f} UGX", delta=f"{roi:.1f}% RO
 col_p2.metric("Total Staked", f"{total_staked:,.0f} UGX")
 col_p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len([t for t in settled_tickets if t['status']=='Won'])}/{len(settled_tickets)} Settled")
 
-# --- Interactive Slips History Log ---
+# --- Interactive History Log ---
 st.markdown("<br>", unsafe_allow_html=True)
-st.subheader("📜 Session Tickets & Auto-Settled Log")
+st.subheader(f"📜 Account History Log (@{st.session_state.authenticated_user})")
 
 if st.session_state.slip_history:
     if st.button("🗑️ Clear History Log"):
         st.session_state.slip_history = []
+        if supabase and st.session_state.authenticated_user:
+            supabase.table("user_tickets").delete().eq("username", st.session_state.authenticated_user).execute()
         st.rerun()
 
     for idx, past_slip in enumerate(st.session_state.slip_history):
@@ -443,4 +487,4 @@ if st.session_state.slip_history:
                 live_leg = MATCH_POOL_DICT.get(match_key, l)
                 st.markdown(f"&nbsp;&nbsp;{leg_idx}. **{l.get('home')} vs {l.get('away')}** -> `{l.get('market')}` @ **{l.get('odds')}** *(Score: {live_leg.get('home_score', 0)} - {live_leg.get('away_score', 0)})*")
 else:
-    st.caption("No tickets generated yet. Generate a slip above to start tracking P&L automatically!")
+    st.caption("No account tickets found. Generate a slip above to save it to your account history!")
