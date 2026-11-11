@@ -113,10 +113,10 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | High-Precision Safe Filtering (Max 5 Odds).*")
+st.markdown("##### *Elite Analytical AI Engine | Nations League & Pro Core.*")
 st.markdown("---")
 
-# --- Whitelist of Core Pro Leagues ---
+# --- Whitelist of Core Pro Leagues (Including UEFA Nations League) ---
 STRICT_BETPAWA_LEAGUES = {
     "eng.1": "English Premier League",
     "eng.2": "English Championship",
@@ -126,6 +126,7 @@ STRICT_BETPAWA_LEAGUES = {
     "fra.1": "French Ligue 1",
     "uefa.champions": "UEFA Champions League",
     "uefa.europa": "UEFA Europa League",
+    "uefa.nations": "UEFA Nations League",
     "caf.champions": "CAF Champions League",
 }
 
@@ -254,7 +255,7 @@ def record_slip(legs, title, odds, stake, payout):
             "status": "Pending"
         })
 
-# Generation Logic (Allowing up to 4 legs to reach 5.0 odds safely)
+# Generation Logic
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
         st.warning("⚠️ No fixtures met the strict AI safety threshold (Trust >= 9.6). Check back near kick-off!")
