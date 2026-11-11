@@ -113,10 +113,10 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | Nations League & Pro Core.*")
+st.markdown("##### *Elite Analytical AI Engine | Up to 10-Leg Safe Accumulators.*")
 st.markdown("---")
 
-# --- Whitelist of Core Pro Leagues (Including UEFA Nations League) ---
+# --- Whitelist of Core Pro Leagues ---
 STRICT_BETPAWA_LEAGUES = {
     "eng.1": "English Premier League",
     "eng.2": "English Championship",
@@ -255,7 +255,7 @@ def record_slip(legs, title, odds, stake, payout):
             "status": "Pending"
         })
 
-# Generation Logic
+# Generation Logic (Allowing up to 10 legs max)
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
         st.warning("⚠️ No fixtures met the strict AI safety threshold (Trust >= 9.6). Check back near kick-off!")
@@ -265,12 +265,12 @@ if generate_clicked or sure_clicked:
         selected_legs, current_prod = [], 1.0
 
         for match in cautious_pool:
-            if current_prod < target_odds and len(selected_legs) < 4:
+            if current_prod < target_odds and len(selected_legs) < 10:
                 selected_legs.append(match)
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"🛡️ ALPHASTAKE ULTRA-SAFE SLIP (Target: {target_odds}x)"
+        st.session_state.slip_title = f"🛡️ ALPHASTAKE ULTRA-SAFE SLIP (Target: {target_odds}x, Up to 10 Legs)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
