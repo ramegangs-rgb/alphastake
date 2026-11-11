@@ -113,36 +113,8 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | Kelly Staking & Corrected P&L.*")
+st.markdown("##### *Elite Analytical AI Engine | Pro Core & Auto P&L.*")
 st.markdown("---")
-
-# --- Sidebar: Kelly Staking & 10-Day Compounding Challenge ---
-st.sidebar.markdown("### 💰 Kelly Bankroll & Staking")
-total_bankroll = st.sidebar.number_input(
-    "Total Bankroll (UGX):", min_value=1000, value=50000, step=5000
-)
-kelly_fraction = st.sidebar.slider(
-    "Kelly Risk Fraction:", min_value=0.1, max_value=1.0, value=0.25, step=0.05
-)
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### 📈 10-Day Compounding Challenge")
-comp_start = st.sidebar.number_input(
-    "Challenge Starting Bank (UGX):", min_value=1000, value=10000, step=1000
-)
-daily_target_mult = st.sidebar.slider(
-    "Daily Target Odds:", min_value=1.20, max_value=2.50, value=1.50, step=0.10
-)
-
-if st.sidebar.checkbox("View 10-Day Compounding Roadmap"):
-  st.sidebar.markdown("#### 🚀 Growth Projection")
-  current_val = comp_start
-  for day in range(1, 11):
-    target_payout = current_val * daily_target_mult
-    st.sidebar.text(
-        f"Day {day}: Start {current_val:,.0f} ➔ Target {target_payout:,.0f}"
-    )
-    current_val = target_payout
 
 # --- Whitelist of Core Pro Leagues ---
 STRICT_BETPAWA_LEAGUES = {
@@ -286,6 +258,9 @@ target_odds = st.number_input(
     value=3.50,
     step=0.25,
 )
+stake_amount = st.number_input(
+    "Stake Amount (UGX):", min_value=500, value=5000, step=500
+)
 
 st.markdown("<br>", unsafe_allow_html=True)
 col1, col2 = st.columns(2)
@@ -347,26 +322,16 @@ if generate_clicked or sure_clicked:
     for l in selected_legs:
       total_odds_prod *= l.get("odds", 1.20)
 
-    # Kelly Stake Calculation
-    estimated_win_prob = min(0.85, max(0.60, 1.0 / (total_odds_prod * 0.95)))
-    b = total_odds_prod - 1
-    q = 1 - estimated_win_prob
-    kelly_pct = ((b * estimated_win_prob - q) / b) if b > 0 else 0.05
-    kelly_pct = max(0.01, min(kelly_pct * kelly_fraction, 0.20))
-
-    optimal_stake = round(total_bankroll * kelly_pct, -2)
-    optimal_stake = max(500, optimal_stake)
-
     payout_calc = (
         total_odds_prod
-        * optimal_stake
+        * stake_amount
         * (1 + min(len(selected_legs) * 5, 100) / 100)
     )
     record_slip(
         selected_legs,
         st.session_state.slip_title,
         round(total_odds_prod, 2),
-        optimal_stake,
+        stake_amount,
         payout_calc,
     )
 
@@ -421,17 +386,15 @@ if st.session_state.generated_slip:
   for leg in st.session_state.generated_slip:
     total_odds *= leg.get("odds", 1.20)
 
-  latest_ticket = st.session_state.slip_history[0]
-  optimal_stake = latest_ticket["stake"]
-  final_payout = latest_ticket["payout"]
   bonus = min(len(st.session_state.generated_slip) * 5, 100)
+  final_payout = total_odds * stake_amount * (1 + bonus / 100)
 
   st.markdown(
       f"""
         <div class="slip-box">
             <h3 style="margin: 0; color: #10B981;">Target: {target_odds}x &nbsp;|&nbsp; Actual: {round(total_odds, 2)}x</h3>
             <p style="margin: 6px 0 0 0; font-size: 14px;">
-                Kelly Optimal Stake: <b>{optimal_stake:,.0f} UGX</b> &nbsp;|&nbsp; 
+                Stake: {stake_amount:,.0f} UGX &nbsp;|&nbsp; 
                 Bonus: +{bonus}% &nbsp;|&nbsp; 
                 Est. Payout: <b>{final_payout:,.0f} UGX</b>
             </p>
@@ -441,8 +404,8 @@ if st.session_state.generated_slip:
   )
 
   slip_text = (
-      f"⚡ *ALPHASTAKE KELLY-OPTIMIZED SLIP* ⚡\nTarget: {target_odds}x | Actual:"
-      f" {round(total_odds, 2)}x\nStake: {optimal_stake:,} UGX | Est Return:"
+      f"⚡ *ALPHASTAKE ULTRA-SAFE SLIP* ⚡\nTarget: {target_odds}x | Actual:"
+      f" {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return:"
       f" {final_payout:,.0f} UGX\n"
       + "-" * 30
       + "\n"
@@ -490,16 +453,15 @@ if st.session_state.generated_slip:
   st.text_area("📋 Copy Booking Text", slip_text, height=130)
 else:
   st.info(
-      "👈 Set your bankroll in the sidebar and click **Generate** or"
-      " **sure** to calculate your Kelly optimal stake."
+      "👈 Set your target odds and stake above and click **Generate** or"
+      " **sure**."
   )
 
-# --- Profit & Loss Dashboard (Fixed Net Profit Accounting) ---
+# --- Profit & Loss Dashboard (Corrected Net Profit Accounting) ---
 st.markdown("---")
 st.subheader("📊 Session P&L Performance Tracker (Auto-Settling)")
 
 total_staked = sum(ticket["stake"] for ticket in st.session_state.slip_history)
-# Corrected: Net profit is (Payout - Stake) for won tickets, minus total stakes for lost ones
 total_won_payouts = sum(
     ticket["payout"]
     for ticket in st.session_state.slip_history
@@ -555,7 +517,7 @@ if st.session_state.slip_history:
         f" ({past_slip['odds']}x) — [{badge_icon} {status_label}]"
     ):
       st.markdown(
-          f"**Kelly Stake:** {past_slip['stake']:,} UGX | **Est Payout:**"
+          f"**Stake:** {past_slip['stake']:,} UGX | **Est Payout:**"
           f" **{past_slip['payout']:,.0f} UGX**"
       )
       st.markdown("---")
@@ -570,6 +532,6 @@ if st.session_state.slip_history:
         )
 else:
   st.caption(
-      "No tickets generated yet. Generate a slip above to start tracking Kelly"
-      " stakes automatically!"
+      "No tickets generated yet. Generate a slip above to start tracking P&L"
+      " automatically!"
   )
