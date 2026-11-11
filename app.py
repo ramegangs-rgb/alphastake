@@ -113,7 +113,7 @@ st.markdown(
 """,
     unsafe_allow_html=True,
 )
-st.markdown("##### *Elite Analytical AI Engine | Ultra-Safe Strict Risk Filtering.*")
+st.markdown("##### *Elite Analytical AI Engine | High-Precision Safe Filtering (Max 5 Odds).*")
 st.markdown("---")
 
 # --- Whitelist of Core Pro Leagues ---
@@ -223,7 +223,7 @@ MATCH_POOL = list(MATCH_POOL_DICT.values())
 
 # --- Main Configuration Interface ---
 st.markdown("### 🎯 Ultra-Safe Betslip Configuration")
-target_odds = st.number_input("Target Number of Odds:", min_value=1.10, max_value=10.00, value=2.50, step=0.25)
+target_odds = st.number_input("Target Number of Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
 stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, value=5000, step=500)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -254,7 +254,7 @@ def record_slip(legs, title, odds, stake, payout):
             "status": "Pending"
         })
 
-# Generation Logic
+# Generation Logic (Allowing up to 4 legs to reach 5.0 odds safely)
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
         st.warning("⚠️ No fixtures met the strict AI safety threshold (Trust >= 9.6). Check back near kick-off!")
@@ -264,12 +264,12 @@ if generate_clicked or sure_clicked:
         selected_legs, current_prod = [], 1.0
 
         for match in cautious_pool:
-            if current_prod < target_odds and len(selected_legs) < 3:
+            if current_prod < target_odds and len(selected_legs) < 4:
                 selected_legs.append(match)
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = "🛡️ ALPHASTAKE ULTRA-SAFE SLIP (Strict 3-Leg Cap)"
+        st.session_state.slip_title = f"🛡️ ALPHASTAKE ULTRA-SAFE SLIP (Target: {target_odds}x)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
