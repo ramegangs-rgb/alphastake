@@ -155,7 +155,7 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                ⚡ ALPHASTAKE v3.0 | 10 ELITE LEAGUES EXCLUSIVE
+                ⚡ ALPHASTAKE v3.0 | UEFA & CAF PRIORITY
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
@@ -224,7 +224,7 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🟢 10-LEAGUE EXCLUSIVE ACTIVE
+            🟢 UEFA & CAF PRIORITY ACTIVE
         </div>
     </div>
 """,
@@ -233,7 +233,7 @@ st.markdown(
 
 col_s1, col_s2, col_s3 = st.columns(3)
 col_s1.markdown('<div class="hero-stat-card"><div class="hero-stat-val">9.9/10</div><div class="hero-stat-lbl">Safety Index</div></div>', unsafe_allow_html=True)
-col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">10 / 10</div><div class="hero-stat-lbl">Strict Pro Leagues</div></div>', unsafe_allow_html=True)
+col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">UEFA/CAF</div><div class="hero-stat-lbl">Priority Feed</div></div>', unsafe_allow_html=True)
 col_s3.markdown('<div class="hero-stat-card"><div class="hero-stat-val">SYNC</div><div class="hero-stat-lbl">Cloud Database Active</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -242,18 +242,18 @@ if st.sidebar.button("🔒 Logout Terminal"):
     st.session_state.authenticated_user = None
     st.rerun()
 
-# --- EXCLUSIVE 10-LEAGUE WHITELIST DICTIONARY ---
+# --- EXCLUSIVE 10-LEAGUE WHITELIST DICTIONARY (UEFA & CAF TOP PRIORITY) ---
 STRICT_ELITE_LEAGUES = {
+    "uefa.nations": "UEFA Nations League",
+    "caf.champions": "CAF Champions League",
+    "uefa.champions": "UEFA Champions League",
+    "uefa.europa": "UEFA Europa League",
     "eng.1": "English Premier League",
     "eng.2": "English Championship",
     "esp.1": "Spanish La Liga",
     "ita.1": "Italian Serie A",
     "ger.1": "German Bundesliga",
     "fra.1": "French Ligue 1",
-    "uefa.champions": "UEFA Champions League",
-    "uefa.europa": "UEFA Europa League",
-    "uefa.nations": "UEFA Nations League",
-    "caf.champions": "CAF Champions League",
 }
 
 def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.02):
@@ -287,7 +287,16 @@ def fetch_analyzed_matches():
                         continue
 
                     matched_key = None
-                    if "eng.1" in league_slug or "premier-league" in league_slug:
+                    # STRICT PRIORITY MATCHING FOR UEFA NATIONS LEAGUE & CAF CHAMPIONS LEAGUE FIRST
+                    if "uefa.nations" in league_slug or "nations-league" in league_slug or "nations" in full_league_str:
+                        matched_key = "uefa.nations"
+                    elif "caf.champions" in league_slug or "caf-champions" in league_slug or "caf" in full_league_str:
+                        matched_key = "caf.champions"
+                    elif "uefa.champions" in league_slug or "champions-league" in league_slug:
+                        matched_key = "uefa.champions"
+                    elif "uefa.europa" in league_slug or "europa-league" in league_slug:
+                        matched_key = "uefa.europa"
+                    elif "eng.1" in league_slug or "premier-league" in league_slug:
                         matched_key = "eng.1"
                     elif "eng.2" in league_slug or "championship" in league_slug:
                         matched_key = "eng.2"
@@ -299,14 +308,6 @@ def fetch_analyzed_matches():
                         matched_key = "ger.1"
                     elif "fra.1" in league_slug or "ligue-1" in league_slug:
                         matched_key = "fra.1"
-                    elif "uefa.champions" in league_slug or "champions-league" in league_slug:
-                        matched_key = "uefa.champions"
-                    elif "uefa.europa" in league_slug or "europa-league" in league_slug:
-                        matched_key = "uefa.europa"
-                    elif "uefa.nations" in league_slug or "nations-league" in league_slug:
-                        matched_key = "uefa.nations"
-                    elif "caf.champions" in league_slug or "caf-champions" in league_slug:
-                        matched_key = "caf.champions"
 
                     if not matched_key:
                         continue
@@ -392,7 +393,7 @@ if supabase and st.session_state.authenticated_user:
         pass
 
 # --- Configuration Panel ---
-st.markdown("### ⚙️ Elite Terminal Generator")
+st.markdown("### ⚙️ Elite Terminal Generator (UEFA & CAF Priority)")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
     target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
@@ -409,7 +410,7 @@ with col2:
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "Elite 10-League Betslip"
+    st.session_state.slip_title = "UEFA & CAF Priority Betslip"
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -437,10 +438,13 @@ def record_slip(legs, title, odds, stake, payout):
 # Generation Logic
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
-        st.warning("⚠️ No active fixtures found right now across your 10 elite leagues. Check back near matchday kick-off!")
+        st.warning("⚠️ No active fixtures found right now across your elite leagues. Check back near matchday kick-off!")
     else:
-        cautious_pool = [m for m in MATCH_POOL if m["trust"] >= 9.6] or MATCH_POOL
-        random.shuffle(cautious_pool)
+        # Prioritize UEFA Nations League and CAF Champions League matches in selection pool
+        priority_pool = [m for m in MATCH_POOL if "Nations" in m["league"] or "CAF" in m["league"]]
+        other_pool = [m for m in MATCH_POOL if m not in priority_pool]
+        cautious_pool = priority_pool + other_pool
+
         selected_legs, current_prod = [], 1.0
 
         for match in cautious_pool:
@@ -449,7 +453,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"⚽ EXCLUSIVE 10-LEAGUE SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"⚽ UEFA/CAF PRIORITY SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -486,7 +490,7 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE 10-LEAGUE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE UEFA/CAF SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
