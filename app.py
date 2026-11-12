@@ -42,7 +42,6 @@ st.markdown(
         color: #F3F4F6;
     }
 
-    /* Animated Neon Title */
     @keyframes pulseGlow {
         0% { text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
         50% { text-shadow: 0 0 28px rgba(16, 185, 129, 0.8), 0 0 40px rgba(59, 130, 246, 0.5); }
@@ -82,7 +81,6 @@ st.markdown(
         margin-top: 2px;
     }
 
-    /* Glassmorphism Cards */
     .glass-card {
         background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -128,7 +126,6 @@ st.markdown(
         font-style: italic;
     }
 
-    /* Custom Streamlit Buttons */
     .stButton>button {
         background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
         color: #000000 !important;
@@ -158,7 +155,7 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                ⚡ ALPHASTAKE v3.0 | GLOBAL TERMINAL
+                ⚡ ALPHASTAKE v3.0 | 10 ELITE LEAGUES ONLY
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
@@ -227,18 +224,17 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🟢 AI ENGINE ONLINE
+            🟢 10-LEAGUE ENGINE ACTIVE
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
-# Hero Stat Strip
 col_s1, col_s2, col_s3 = st.columns(3)
 col_s1.markdown('<div class="hero-stat-card"><div class="hero-stat-val">9.8/10</div><div class="hero-stat-lbl">Safety Rating</div></div>', unsafe_allow_html=True)
-col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">89.4%</div><div class="hero-stat-lbl">Model Accuracy</div></div>', unsafe_allow_html=True)
-col_s3.markdown('<div class="hero-stat-card"><div class="hero-stat-val">GLOBAL</div><div class="hero-stat-lbl">Markets Active</div></div>', unsafe_allow_html=True)
+col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">10</div><div class="hero-stat-lbl">Strict Pro Leagues</div></div>', unsafe_allow_html=True)
+col_s3.markdown('<div class="hero-stat-card"><div class="hero-stat-val">SYNC</div><div class="hero-stat-lbl">Cloud Database Active</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -246,8 +242,8 @@ if st.sidebar.button("🔒 Logout Terminal"):
     st.session_state.authenticated_user = None
     st.rerun()
 
-# --- Whitelist of Core Pro Leagues ---
-STRICT_BETPAWA_LEAGUES = {
+# --- STRICT 10-LEAGUE WHITELIST ONLY ---
+STRICT_LEAGUES = {
     "eng.1": "English Premier League",
     "eng.2": "English Championship",
     "esp.1": "Spanish La Liga",
@@ -284,14 +280,15 @@ def fetch_analyzed_matches():
                     league_slug = league_obj.get("slug", "").lower()
                     league_name = league_slug.replace("-", ".").lower()
 
-                    matched_league = None
-                    for key, lname in STRICT_BETPAWA_LEAGUES.items():
+                    # STRICT FILTER: Must match one of the exact 10 keys
+                    matched_key = None
+                    for key in STRICT_LEAGUES.keys():
                         if key in league_name or any(term in league_name for term in key.split(".")):
-                            matched_league = lname
+                            matched_key = key
                             break
 
-                    if not matched_league or any(term in league_name for term in ["college", "ncaa", "women", "high-school", "friendly"]):
-                        continue
+                    if not matched_key:
+                        continue  # Discard everything not in the 10 leagues
 
                     status_type = event.get("status", {}).get("type", {}).get("description", "Scheduled")
                     comps = event.get("competitions", [])
@@ -346,6 +343,7 @@ def fetch_analyzed_matches():
                                     "home_score": home_score,
                                     "away_score": away_score,
                                     "status": status_type,
+                                    "league": STRICT_LEAGUES[matched_key],
                                     "market": market,
                                     "odds": odds,
                                     "trust": trust,
@@ -418,7 +416,7 @@ def record_slip(legs, title, odds, stake, payout):
 # Generation Logic
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
-        st.warning("⚠️ No fixtures met the strict AI safety threshold. Check back near kick-off!")
+        st.warning("⚠️ No fixtures found in your 10 elite leagues right now. Check back near kick-off!")
     else:
         cautious_pool = [m for m in MATCH_POOL if m["trust"] >= 9.6] or MATCH_POOL
         random.shuffle(cautious_pool)
@@ -430,7 +428,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"🌍 ALPHASTAKE ULTRA-SAFE SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"⚽ ELITE 10-LEAGUE SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -467,7 +465,7 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE ULTRA-SAFE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE 10-LEAGUE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
@@ -484,6 +482,7 @@ if st.session_state.generated_slip:
                     <b style="font-size: 16px; color: #FFF;">Leg {i}: {leg.get('home')} vs {leg.get('away')}</b>
                     {status_badge}
                 </div>
+                <div style="font-size: 12px; color: #10B981; margin-bottom: 4px; font-weight: 700;">🏆 {leg.get('league')}</div>
                 <div style="margin: 6px 0;">
                     Selection: <span class="badge-market-cyber">{leg.get('market')}</span> &nbsp; Odds: <b style="color: #10B981;">{leg.get('odds')}</b>
                 </div>
@@ -493,7 +492,7 @@ if st.session_state.generated_slip:
             """,
             unsafe_allow_html=True,
         )
-        slip_text += f"{i}. {leg.get('home')} vs {leg.get('away')} -> {leg.get('market')} @ {leg.get('odds')}\n"
+        slip_text += f"{i}. {leg.get('home')} vs {leg.get('away')} ({leg.get('league')}) -> {leg.get('market')} @ {leg.get('odds')}\n"
 
     encoded_text = urllib.parse.quote(slip_text)
     whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
