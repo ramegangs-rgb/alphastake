@@ -8,7 +8,7 @@ from supabase import create_client, Client
 
 # --- Page Setup ---
 st.set_page_config(
-    page_title="AlphaStake | AI Betting Terminal",
+    page_title="AlphaStake | Elite 10-League Terminal",
     page_icon="⚽",
     layout="centered",
 )
@@ -155,11 +155,11 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                ⚡ ALPHASTAKE v3.0 | 10 ELITE LEAGUES ONLY
+                ⚡ ALPHASTAKE v3.0 | 10 ELITE LEAGUES EXCLUSIVE
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
-                Next-generation sports intelligence & high-safety accumulator engine.
+                Strict 10-League Professional Intelligence & Accumulator Terminal.
             </p>
         </div>
     """,
@@ -224,7 +224,7 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🟢 10-LEAGUE ENGINE ACTIVE
+            🟢 10-LEAGUE EXCLUSIVE ACTIVE
         </div>
     </div>
 """,
@@ -232,8 +232,8 @@ st.markdown(
 )
 
 col_s1, col_s2, col_s3 = st.columns(3)
-col_s1.markdown('<div class="hero-stat-card"><div class="hero-stat-val">9.8/10</div><div class="hero-stat-lbl">Safety Rating</div></div>', unsafe_allow_html=True)
-col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">10</div><div class="hero-stat-lbl">Strict Pro Leagues</div></div>', unsafe_allow_html=True)
+col_s1.markdown('<div class="hero-stat-card"><div class="hero-stat-val">9.9/10</div><div class="hero-stat-lbl">Safety Index</div></div>', unsafe_allow_html=True)
+col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">10 / 10</div><div class="hero-stat-lbl">Strict Pro Leagues</div></div>', unsafe_allow_html=True)
 col_s3.markdown('<div class="hero-stat-card"><div class="hero-stat-val">SYNC</div><div class="hero-stat-lbl">Cloud Database Active</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -242,8 +242,8 @@ if st.sidebar.button("🔒 Logout Terminal"):
     st.session_state.authenticated_user = None
     st.rerun()
 
-# --- STRICT 10-LEAGUE WHITELIST ONLY ---
-STRICT_LEAGUES = {
+# --- EXCLUSIVE 10-LEAGUE WHITELIST DICTIONARY ---
+STRICT_ELITE_LEAGUES = {
     "eng.1": "English Premier League",
     "eng.2": "English Championship",
     "esp.1": "Spanish La Liga",
@@ -280,15 +280,15 @@ def fetch_analyzed_matches():
                     league_slug = league_obj.get("slug", "").lower()
                     league_name = league_slug.replace("-", ".").lower()
 
-                    # STRICT FILTER: Must match one of the exact 10 keys
+                    # STRICT WHITELIST VALIDATION: Must match one of the exact 10 keys
                     matched_key = None
-                    for key in STRICT_LEAGUES.keys():
+                    for key in STRICT_ELITE_LEAGUES.keys():
                         if key in league_name or any(term in league_name for term in key.split(".")):
                             matched_key = key
                             break
 
                     if not matched_key:
-                        continue  # Discard everything not in the 10 leagues
+                        continue  # Hard reject anything outside the 10 elite leagues
 
                     status_type = event.get("status", {}).get("type", {}).get("description", "Scheduled")
                     comps = event.get("competitions", [])
@@ -343,7 +343,7 @@ def fetch_analyzed_matches():
                                     "home_score": home_score,
                                     "away_score": away_score,
                                     "status": status_type,
-                                    "league": STRICT_LEAGUES[matched_key],
+                                    "league": STRICT_ELITE_LEAGUES[matched_key],
                                     "market": market,
                                     "odds": odds,
                                     "trust": trust,
@@ -371,7 +371,7 @@ if supabase and st.session_state.authenticated_user:
         pass
 
 # --- Configuration Panel ---
-st.markdown("### ⚙️ Terminal Slip Generator")
+st.markdown("### ⚙️ Elite Terminal Generator")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
     target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
@@ -381,14 +381,14 @@ with col_cfg2:
 st.markdown("<br>", unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
-    generate_clicked = st.button("Generate AI Betslip 🚀")
+    generate_clicked = st.button("Generate Elite Slip 🚀")
 with col2:
     sure_clicked = st.button("sure")
 
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "AI Global Markets Betslip"
+    st.session_state.slip_title = "Elite 10-League Betslip"
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -416,7 +416,7 @@ def record_slip(legs, title, odds, stake, payout):
 # Generation Logic
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
-        st.warning("⚠️ No fixtures found in your 10 elite leagues right now. Check back near kick-off!")
+        st.warning("⚠️ No fixtures active right now across your 10 elite leagues. Check back near matchday kick-off!")
     else:
         cautious_pool = [m for m in MATCH_POOL if m["trust"] >= 9.6] or MATCH_POOL
         random.shuffle(cautious_pool)
@@ -428,7 +428,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"⚽ ELITE 10-LEAGUE SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"⚽ EXCLUSIVE 10-LEAGUE SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
