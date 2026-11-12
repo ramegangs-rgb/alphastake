@@ -269,6 +269,8 @@ def fetch_analyzed_matches():
     tomorrow = today + timedelta(days=1)
     dates_to_fetch = [today.strftime("%Y%m%d"), tomorrow.strftime("%Y%m%d")]
 
+    blacklisted_terms = ["college", "ncaa", "women", "u21", "u19", "u20", "high-school", "friendly", "amateur", "reserve"]
+
     for d_str in dates_to_fetch:
         try:
             url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard?dates={d_str}"
@@ -278,17 +280,36 @@ def fetch_analyzed_matches():
                 for event in events:
                     league_obj = event.get("season", {})
                     league_slug = league_obj.get("slug", "").lower()
-                    league_name = league_slug.replace("-", ".").lower()
+                    league_name = league_obj.get("name", "").lower()
+                    full_league_str = f"{league_slug} {league_name}"
 
-                    # STRICT WHITELIST VALIDATION: Must match one of the exact 10 keys
+                    if any(term in full_league_str for term in blacklisted_terms):
+                        continue
+
                     matched_key = None
-                    for key in STRICT_ELITE_LEAGUES.keys():
-                        if key in league_name or any(term in league_name for term in key.split(".")):
-                            matched_key = key
-                            break
+                    if "eng.1" in league_slug or "premier-league" in league_slug:
+                        matched_key = "eng.1"
+                    elif "eng.2" in league_slug or "championship" in league_slug:
+                        matched_key = "eng.2"
+                    elif "esp.1" in league_slug or "la-liga" in league_slug:
+                        matched_key = "esp.1"
+                    elif "ita.1" in league_slug or "serie-a" in league_slug:
+                        matched_key = "ita.1"
+                    elif "ger.1" in league_slug or "bundesliga" in league_slug:
+                        matched_key = "ger.1"
+                    elif "fra.1" in league_slug or "ligue-1" in league_slug:
+                        matched_key = "fra.1"
+                    elif "uefa.champions" in league_slug or "champions-league" in league_slug:
+                        matched_key = "uefa.champions"
+                    elif "uefa.europa" in league_slug or "europa-league" in league_slug:
+                        matched_key = "uefa.europa"
+                    elif "uefa.nations" in league_slug or "nations-league" in league_slug:
+                        matched_key = "uefa.nations"
+                    elif "caf.champions" in league_slug or "caf-champions" in league_slug:
+                        matched_key = "caf.champions"
 
                     if not matched_key:
-                        continue  # Hard reject anything outside the 10 elite leagues
+                        continue
 
                     status_type = event.get("status", {}).get("type", {}).get("description", "Scheduled")
                     comps = event.get("competitions", [])
@@ -416,7 +437,7 @@ def record_slip(legs, title, odds, stake, payout):
 # Generation Logic
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
-        st.warning("⚠️ No fixtures active right now across your 10 elite leagues. Check back near matchday kick-off!")
+        st.warning("⚠️ No active fixtures found right now across your 10 elite leagues. Check back near matchday kick-off!")
     else:
         cautious_pool = [m for m in MATCH_POOL if m["trust"] >= 9.6] or MATCH_POOL
         random.shuffle(cautious_pool)
