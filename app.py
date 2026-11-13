@@ -451,7 +451,7 @@ with st.sidebar.expander("League Feed Status (17 Leagues)", expanded=False):
 st.markdown("### Terminal Slip Generator")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
-    target_odds = st.number_input("Target Total Odds:", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
+    target_odds = st.number_input("Target Total Odds:", min_value=1.10, max_value=10.00, value=3.50, step=0.25)
 with col_cfg2:
     stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, value=5000, step=500)
 
@@ -509,7 +509,7 @@ if st.button("Generate Smart Terminal Slip"):
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"PROBABILITY ACCUMULATOR SLIP"
+        st.session_state.slip_title = "PROBABILITY ACCUMULATOR SLIP"
         
         total_odds_prod = 1.0
         for l in selected_legs:
