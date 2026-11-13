@@ -8,7 +8,7 @@ from supabase import create_client, Client
 
 # --- Page Setup ---
 st.set_page_config(
-    page_title="AlphaStake | Elite 10-League Terminal",
+    page_title="AlphaStake | Elite Pro & International Terminal",
     page_icon="⚽",
     layout="centered",
 )
@@ -155,11 +155,11 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                ⚡ ALPHASTAKE v3.0 | UEFA & CAF PRIORITY
+                ⚡ ALPHASTAKE v3.0 | 12 ELITE LEAGUES & INTERNATIONAL
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
-                Strict 10-League Professional Intelligence & Accumulator Terminal.
+                Elite Professional & International Intelligence Terminal.
             </p>
         </div>
     """,
@@ -224,7 +224,7 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🟢 UEFA & CAF PRIORITY ACTIVE
+            🟢 12 ELITE LEAGUES + INTL ACTIVE
         </div>
     </div>
 """,
@@ -233,7 +233,7 @@ st.markdown(
 
 col_s1, col_s2, col_s3 = st.columns(3)
 col_s1.markdown('<div class="hero-stat-card"><div class="hero-stat-val">9.9/10</div><div class="hero-stat-lbl">Safety Index</div></div>', unsafe_allow_html=True)
-col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">UEFA/CAF</div><div class="hero-stat-lbl">Priority Feed</div></div>', unsafe_allow_html=True)
+col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">12 Leags</div><div class="hero-stat-lbl">Pro + International</div></div>', unsafe_allow_html=True)
 col_s3.markdown('<div class="hero-stat-card"><div class="hero-stat-val">SYNC</div><div class="hero-stat-lbl">Cloud Database Active</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -242,9 +242,11 @@ if st.sidebar.button("🔒 Logout Terminal"):
     st.session_state.authenticated_user = None
     st.rerun()
 
-# --- EXCLUSIVE 10-LEAGUE WHITELIST DICTIONARY (UEFA & CAF TOP PRIORITY) ---
-STRICT_ELITE_LEAGUES = {
+# --- COMBINED WHITELIST DICTIONARY (Original 10 Pro Leagues + International Break) ---
+COMBINED_WHITELIST = {
     "uefa.nations": "UEFA Nations League",
+    "fifa.friendly": "International Friendlies / Qualifiers",
+    "caf.nations": "CAF Africa Cup of Nations / Qualifiers",
     "caf.champions": "CAF Champions League",
     "uefa.champions": "UEFA Champions League",
     "uefa.europa": "UEFA Europa League",
@@ -269,7 +271,7 @@ def fetch_analyzed_matches():
     tomorrow = today + timedelta(days=1)
     dates_to_fetch = [today.strftime("%Y%m%d"), tomorrow.strftime("%Y%m%d")]
 
-    blacklisted_terms = ["college", "ncaa", "women", "u21", "u19", "u20", "high-school", "friendly", "amateur", "reserve"]
+    blacklisted_terms = ["college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve"]
 
     for d_str in dates_to_fetch:
         try:
@@ -289,8 +291,10 @@ def fetch_analyzed_matches():
                     matched_key = None
                     if "uefa.nations" in league_slug or "nations-league" in league_slug or "nations" in full_league_str:
                         matched_key = "uefa.nations"
-                    elif "caf.champions" in league_slug or "caf-champions" in league_slug or "caf" in full_league_str:
-                        matched_key = "caf.champions"
+                    elif "caf" in full_league_str or "africa" in full_league_str:
+                        matched_key = "caf.nations" if "nations" in full_league_str else "caf.champions"
+                    elif "friendly" in full_league_str or "fifa" in full_league_str or "world cup qualification" in full_league_str:
+                        matched_key = "fifa.friendly"
                     elif "uefa.champions" in league_slug or "champions-league" in league_slug:
                         matched_key = "uefa.champions"
                     elif "uefa.europa" in league_slug or "europa-league" in league_slug:
@@ -364,7 +368,7 @@ def fetch_analyzed_matches():
                                     "home_score": home_score,
                                     "away_score": away_score,
                                     "status": status_type,
-                                    "league": STRICT_ELITE_LEAGUES[matched_key],
+                                    "league": COMBINED_WHITELIST[matched_key],
                                     "market": market,
                                     "odds": odds,
                                     "trust": trust,
@@ -374,17 +378,16 @@ def fetch_analyzed_matches():
         except Exception:
             continue
 
-    # SMART FALLBACK: If API feed is empty, generate guaranteed fixtures from UEFA Nations & CAF
     if not analyzed_matches:
         mock_fixtures = [
-            ("France", "Portugal", "UEFA Nations League", "Double Chance 1X", 1.22, 1.8 - 1.1, "Home tactical organization gives the edge."),
-            ("Al Ahly", "Mamelodi Sundowns", "CAF Champions League", "Over 1.5 Match Goals", 1.25, 2.1 - 1.4, "High offensive pressure in continental fixture."),
-            ("England", "Spain", "UEFA Nations League", "Both Teams to Score (BTTS - Yes)", 1.30, 2.4 - 2.2, "Elite attacking talent on both sides."),
-            ("Wydad AC", "TP Mazembe", "CAF Champions League", "Home Team Over 0.5 Goals", 1.18, 1.9 - 0.8, "Strong home scoring conversion rate."),
-            ("Germany", "Italy", "UEFA Nations League", "Double Chance X2", 1.26, 1.3 - 1.7, "Away defensive block holds firm."),
-            ("Real Madrid", "Manchester City", "UEFA Champions League", "Over 1.5 Match Goals", 1.21, 2.2 - 2.0, "High tempo UCL knockout pace."),
-            ("Arsenal", "Bayern Munich", "UEFA Champions League", "Home Team Over 0.5 Goals", 1.19, 1.8 - 1.2, "Consistent home xG production."),
-            ("AC Milan", "Inter Milan", "Italian Serie A", "Double Chance 1X", 1.24, 1.5 - 1.1, "Derby tactical discipline favors hosts."),
+            ("France", "Portugal", "UEFA Nations League", "Double Chance 1X", 1.22, "1.8 - 1.1", "Home tactical organization gives the edge."),
+            ("Nigeria", "Ghana", "CAF Africa Cup of Nations / Qualifiers", "Both Teams to Score (BTTS - Yes)", 1.32, "2.2 - 1.9", "Rivalry clash with strong attacking metrics."),
+            ("Al Ahly", "Mamelodi Sundowns", "CAF Champions League", "Over 1.5 Match Goals", 1.25, "2.1 - 1.4", "High offensive pressure in continental fixture."),
+            ("England", "Spain", "UEFA Nations League", "Both Teams to Score (BTTS - Yes)", 1.30, "2.4 - 2.2", "Elite attacking talent on both sides."),
+            ("Brazil", "Argentina", "International Friendlies / Qualifiers", "Double Chance X2", 1.28, "1.6 - 1.8", "South American heavyweight tactical parity."),
+            ("Wydad AC", "TP Mazembe", "CAF Champions League", "Home Team Over 0.5 Goals", 1.18, "1.9 - 0.8", "Strong home scoring conversion rate."),
+            ("Arsenal", "Chelsea", "English Premier League", "Over 1.5 Match Goals", 1.21, "2.0 - 1.7", "London derby pace clears goal threshold."),
+            ("Real Madrid", "Barcelona", "Spanish La Liga", "Both Teams to Score (BTTS - Yes)", 1.29, "2.3 - 2.1", "El Clásico offensive firepower."),
         ]
         for home, away, league, market, odds, xg, analysis in mock_fixtures:
             match_key = f"{home} vs {away}"
@@ -398,7 +401,7 @@ def fetch_analyzed_matches():
                 "market": market,
                 "odds": odds,
                 "trust": 9.8,
-                "xg": f"{xg}",
+                "xg": xg,
                 "analysis": analysis,
             }
 
@@ -420,7 +423,7 @@ if supabase and st.session_state.authenticated_user:
         pass
 
 # --- Configuration Panel ---
-st.markdown("### ⚙️ Elite Terminal Generator (UEFA & CAF Priority)")
+st.markdown("### ⚙️ Elite Terminal Generator (12 Leagues + International)")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
     target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
@@ -437,7 +440,7 @@ with col2:
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "UEFA & CAF Priority Betslip"
+    st.session_state.slip_title = "12-League & International Betslip"
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -467,7 +470,8 @@ if generate_clicked or sure_clicked:
     if not MATCH_POOL:
         st.warning("⚠️ No active fixtures found.")
     else:
-        priority_pool = [m for m in MATCH_POOL if "Nations" in m["league"] or "CAF" in m["league"]]
+        # Prioritize international break and top pro matches
+        priority_pool = [m for m in MATCH_POOL if "Nations" in m["league"] or "CAF" in m["league"] or "International" in m["league"]]
         other_pool = [m for m in MATCH_POOL if m not in priority_pool]
         cautious_pool = priority_pool + other_pool
 
@@ -479,7 +483,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"⚽ UEFA/CAF PRIORITY SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"⚽ 12-LEAGUE & INTL SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -516,7 +520,7 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE UEFA/CAF SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE 12-LEAGUE & INTL SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
