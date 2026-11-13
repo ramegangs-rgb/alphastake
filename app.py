@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 import hashlib
 import random
@@ -155,11 +156,11 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                🟢 ALPHASTAKE v5.2 | 100% REAL-LIFE FIXTURES ONLY
+                🟢 ALPHASTAKE v5.3 | PARALLEL LIVE FEED ENGINE
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
-                Strict 17-League Live Feed — Zero Simulated Matches.
+                Strict 17-League Real-Time Scraper — Zero Mock Games.
             </p>
         </div>
     """,
@@ -275,14 +276,14 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🟢 100% REAL-LIFE 17-LEAGUE FEED
+            🟢 LIVE 17-LEAGUE REAL FEED
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
-# --- EXACT 17-LEAGUE WHITELIST & DIRECT ESPN ENDPOINT SLUGS ---
+# --- EXACT 17-LEAGUE WHITELIST & ESPN ENDPOINT SLUGS ---
 EXACT_17_LEAGUES = {
     "eng.1": "English Premier League",
     "fra.1": "Ligue 1",
@@ -303,31 +304,47 @@ EXACT_17_LEAGUES = {
     "tur.1": "Turkish Süper Lig",
 }
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json",
+}
+
 def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.02):
-    if probability <= 0: return 99.00
+    if probability <= 0:
+        return 99.00
     adjusted_prob = probability * (1 + margin)
     raw_odds = (1 / adjusted_prob) * market_boost
     return max(min(round(raw_odds, 2), 1.55), 1.12)
 
-@st.cache_data(ttl=60)
+def _fetch_single_endpoint(slug, clean_league_name, date_str):
+    """Fetches a single league + single date cleanly."""
+    url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={date_str}"
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=6)
+        if res.status_code == 200:
+            return clean_league_name, res.json().get("events", [])
+    except Exception:
+        pass
+    return clean_league_name, []
+
+@st.cache_data(ttl=120)
 def fetch_real_life_matches():
     analyzed_matches = {}
+    league_counts = {name: 0 for name in EXACT_17_LEAGUES.values()}
     today = datetime.now()
-    # Fetch across a 7-day window (today + next 6 days) so real upcoming fixtures are always available
-    dates_to_fetch = [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(0, 7)]
-    date_range_param = f"{dates_to_fetch[0]}-{dates_to_fetch[-1]}"
+    # Single daily dates across today and next 4 days (avoids broken ESPN hyphenated range queries)
+    dates_to_fetch = [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(0, 5)]
 
-    blacklisted_terms = ["usl", "mls", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth", "championship"]
+    blacklisted_terms = ["usl", "mls", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth"]
 
-    # Query each of the 17 exact league endpoints directly using a 7-day date range
-    for slug, clean_league_name in EXACT_17_LEAGUES.items():
-        try:
-            url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={date_range_param}"
-            res = requests.get(url, timeout=5)
-            if res.status_code != 200:
-                continue
+    tasks = []
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        for slug, clean_league_name in EXACT_17_LEAGUES.items():
+            for d_str in dates_to_fetch:
+                tasks.append(executor.submit(_fetch_single_endpoint, slug, clean_league_name, d_str))
 
-            events = res.json().get("events", [])
+        for future in as_completed(tasks):
+            clean_league_name, events = future.result()
             for event in events:
                 league_obj = event.get("season", {})
                 api_slug = league_obj.get("slug", "").lower()
@@ -340,8 +357,6 @@ def fetch_real_life_matches():
                 status_obj = event.get("status", {}).get("type", {})
                 status_type = status_obj.get("description", "Scheduled")
                 short_detail = status_obj.get("shortDetail", "")
-                
-                # Format real match date/time
                 raw_date = event.get("date", "")
                 match_date_str = short_detail if short_detail else raw_date[:10]
 
@@ -361,7 +376,6 @@ def fetch_real_life_matches():
                             if match_key in analyzed_matches:
                                 continue
 
-                            # Deterministic seed per match so odds/markets stay consistent on refresh
                             rng = random.Random(match_key)
                             home_xg = round(rng.uniform(1.1, 2.5), 2)
                             away_xg = round(rng.uniform(0.9, 2.3), 2)
@@ -407,12 +421,11 @@ def fetch_real_life_matches():
                                 "xg": f"{home_xg} - {away_xg}",
                                 "analysis": analysis,
                             }
-        except Exception:
-            continue
+                            league_counts[clean_league_name] = league_counts.get(clean_league_name, 0) + 1
 
-    return analyzed_matches
+    return analyzed_matches, league_counts
 
-MATCH_POOL_DICT = fetch_real_life_matches()
+MATCH_POOL_DICT, LEAGUE_COUNTS = fetch_real_life_matches()
 MATCH_POOL = list(MATCH_POOL_DICT.values())
 
 # --- Persistent Account History Loader ---
@@ -438,6 +451,7 @@ col_s3.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(st
 
 st.markdown("<br>", unsafe_allow_html=True)
 
+# --- Sidebar Controls & Live Feed Diagnostics ---
 if st.sidebar.button("🔄 Refresh Live Fixtures"):
     st.cache_data.clear()
     st.rerun()
@@ -451,6 +465,14 @@ if st.sidebar.button("🧹 Reset AI Memory Weights"):
     st.session_state.league_weights = {}
     st.session_state.mistake_log = []
     st.sidebar.success("AI memory reset to baseline 1.0x!")
+
+with st.sidebar.expander("📡 Live Feed Breakdown (17 Leagues)", expanded=True):
+    active_leagues = {k: v for k, v in LEAGUE_COUNTS.items() if v > 0}
+    if active_leagues:
+        for lg_name, count in sorted(active_leagues.items(), key=lambda x: x[1], reverse=True):
+            st.markdown(f"✅ **{lg_name}**: `{count}` matches")
+    else:
+        st.warning("0 matches returned across endpoints.")
 
 # --- Configuration Panel ---
 st.markdown("### ⚙️ Real-Life 17-League Slip Generator")
@@ -498,7 +520,7 @@ def record_slip(legs, title, odds, stake, payout):
 # --- Generation Logic ---
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
-        st.error("⚠️ No live or upcoming fixtures found across the 17 leagues in ESPN's feed right now. Hit 'Refresh Live Fixtures' in the sidebar or check your internet connection.")
+        st.error("⚠️ ESPN returned 0 active fixtures for today/next 4 days across the 17 endpoints. Check the sidebar 'Live Feed Breakdown' or try again shortly.")
     else:
         scored_pool = []
         for m in MATCH_POOL:
