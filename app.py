@@ -155,7 +155,7 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                ⚽ ALPHASTAKE v5.0 | EXACT 17-LEAGUE WHITELIST
+                🔒 ALPHASTAKE v5.1 | STRICT 17-LEAGUE GATEKEEPER
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
@@ -275,14 +275,14 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🔒 17-LEAGUE STRICT WHITELIST LOCKED
+            🔒 EXACT 17-LEAGUE GATEKEEPER ACTIVE
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
-# --- EXACT 17-LEAGUE WHITELIST DICTIONARY ---
+# --- EXACT 17-LEAGUE WHITELIST DICTIONARY (ZERO TOLERANCE FOR OTHER LEAGUES) ---
 EXACT_17_LEAGUES = {
     "eng.1": "English Premier League",
     "fra.1": "Ligue 1",
@@ -319,19 +319,26 @@ def fetch_analyzed_matches():
         (today + timedelta(days=1)).strftime("%Y%m%d")
     ]
 
-    blacklisted_terms = ["college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth"]
+    # Hard blacklist for any unwanted leagues, USL, lower divisions, youth, or college
+    blacklisted_terms = ["usl", "mls", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth", "championship"]
 
+    # We ONLY query endpoints dedicated specifically to our approved leagues
     api_endpoints = [
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard",
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard",
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard",
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard",
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard",
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard",
         "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard"
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard",
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard",
     ]
 
     for d_str in dates_to_fetch:
         for base_url in api_endpoints:
             try:
                 url = f"{base_url}?dates={d_str}"
-                res = requests.get(url, timeout=5)
+                res = requests.get(url, timeout=4)
                 if res.status_code == 200:
                     events = res.json().get("events", [])
                     for event in events:
@@ -340,20 +347,21 @@ def fetch_analyzed_matches():
                         league_name = event.get("league", {}).get("name", "").lower()
                         full_league_str = f"{league_slug} {league_name}"
 
+                        # Hard reject if any blacklisted term appears
                         if any(term in full_league_str for term in blacklisted_terms):
                             continue
 
                         matched_key = None
-                        # Strict 17-League Matching Rules
+                        # STRICT MATCHING AGAINST THE 17 KEYS ONLY
                         if "eng.1" in league_slug or "premier league" in full_league_str:
                             matched_key = "eng.1"
                         elif "fra.1" in league_slug or "ligue 1" in full_league_str:
                             matched_key = "fra.1"
                         elif "esp.1" in league_slug or "la liga" in full_league_str:
                             matched_key = "esp.1"
-                        elif "ita.1" in league_slug or "serie a" in full_league_str and "brazil" not in full_league_str:
+                        elif "ita.1" in league_slug or ("serie a" in full_league_str and "brazil" not in full_league_str):
                             matched_key = "ita.1"
-                        elif "bra.1" in league_slug or "brazil" in full_league_str or "serie a" in full_league_str and "brazil" in full_league_str:
+                        elif "bra.1" in league_slug or "brazil" in full_league_str:
                             matched_key = "bra.1"
                         elif "champions-league" in league_slug or "champions league" in full_league_str:
                             matched_key = "uefa.champions"
@@ -365,11 +373,11 @@ def fetch_analyzed_matches():
                             matched_key = "uefa.europa"
                         elif "sco.1" in league_slug or "scottish premiership" in full_league_str:
                             matched_key = "sco.1"
-                        elif "ger.1" in league_slug or "bundesliga" in full_league_str and "austria" not in full_league_str:
+                        elif "ger.1" in league_slug or ("bundesliga" in full_league_str and "austria" not in full_league_str):
                             matched_key = "ger.1"
                         elif "africa cup of nations" in full_league_str or "afcon" in full_league_str:
                             matched_key = "caf.nations"
-                        elif "bel.1" in league_slug or "belgian" in full_league_str or "pro league" in full_league_str:
+                        elif "bel.1" in league_slug or "belgian" in full_league_str:
                             matched_key = "bel.1"
                         elif "ned.1" in league_slug or "eredivisie" in full_league_str:
                             matched_key = "ned.1"
@@ -377,10 +385,11 @@ def fetch_analyzed_matches():
                             matched_key = "nor.1"
                         elif "por.1" in league_slug or "liga portugal" in full_league_str:
                             matched_key = "por.1"
-                        elif "tur.1" in league_slug or "super lig" in full_league_str or "sueper lig" in full_league_str:
+                        elif "tur.1" in league_slug or "super lig" in full_league_str:
                             matched_key = "tur.1"
 
-                        if not matched_key:
+                        # ABSOLUTE GATEKEEPER CHECK: If it's not in EXACT_17_LEAGUES, drop it instantly
+                        if not matched_key or matched_key not in EXACT_17_LEAGUES:
                             continue
 
                         status_type = event.get("status", {}).get("type", {}).get("description", "Scheduled")
@@ -445,7 +454,7 @@ def fetch_analyzed_matches():
             except Exception:
                 continue
 
-    # Guaranteed test mode fallback using exclusively the 17 leagues if API pool is quiet
+    # Guaranteed test mode fallback using strictly the 17 leagues
     if not analyzed_matches:
         mock_fixtures = [
             ("Arsenal", "Chelsea", "English Premier League", "Over 1.5 Match Goals", 1.21, "2.0 - 1.7", "London derby pace clears goal threshold."),
@@ -496,7 +505,7 @@ recalculate_ai_weights(st.session_state.slip_history)
 top_learned_market = max(st.session_state.market_weights.items(), key=lambda x: x[1])
 col_s1, col_s2, col_s3 = st.columns(3)
 col_s1.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{top_learned_market[1]:.2f}x</div><div class="hero-stat-lbl">Top Market Boost</div></div>', unsafe_allow_html=True)
-col_s2.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">17 Leags</div><div class="hero-stat-lbl">Strict Whitelist</div></div>', unsafe_allow_html=True)
+col_s2.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">17 Leags</div><div class="hero-stat-lbl">Strict Gatekeeper</div></div>', unsafe_allow_html=True)
 col_s3.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(st.session_state.mistake_log)}</div><div class="hero-stat-lbl">Lessons Learned</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -512,7 +521,7 @@ if st.sidebar.button("🔄 Reset AI Memory Weights"):
     st.sidebar.success("AI memory reset to baseline 1.0x!")
 
 # --- Configuration Panel ---
-st.markdown("### ⚙️ 17-League Terminal Generator")
+st.markdown("### ⚙️ Strict 17-League Terminal Generator")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
     target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
