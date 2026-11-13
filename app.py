@@ -9,8 +9,8 @@ from supabase import create_client, Client
 
 # --- Page Setup ---
 st.set_page_config(
-    page_title="AlphaStake | Live 17-League Terminal",
-    page_icon="⚽",
+    page_title="AlphaStake | Professional Trading Terminal",
+    page_icon="⚡",
     layout="centered",
 )
 
@@ -28,119 +28,98 @@ if SUPABASE_URL and SUPABASE_KEY:
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Ultra-Aesthetic Cyberpunk Glass CSS ---
+# --- Ultra-Aesthetic Professional Terminal CSS ---
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
     html, body, [class*="css"] {
         font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
     }
 
     .stApp {
-        background: radial-gradient(circle at 50% -20%, #1e1035 0%, #0d0714 60%, #05020a 100%);
-        color: #F3F4F6;
+        background: #090B10;
+        color: #E2E8F0;
     }
 
-    @keyframes pulseGlow {
-        0% { text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
-        50% { text-shadow: 0 0 28px rgba(16, 185, 129, 0.8), 0 0 40px rgba(59, 130, 246, 0.5); }
-        100% { text-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
-    }
-
-    .brand-title-cyber {
-        font-size: 38px;
+    .brand-title-terminal {
+        font-size: 32px;
         font-weight: 800;
-        background: linear-gradient(135deg, #FFFFFF 0%, #10B981 50%, #3B82F6 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #F8FAFC;
         margin: 0;
-        letter-spacing: -1px;
-        animation: pulseGlow 3s infinite alternate;
+        letter-spacing: -0.5px;
     }
 
-    .hero-stat-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(12px);
-        border-radius: 16px;
-        padding: 16px;
+    .terminal-stat-card {
+        background: #111522;
+        border: 1px solid #1E293B;
+        border-radius: 12px;
+        padding: 14px;
         text-align: center;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
     }
-    .hero-stat-val {
-        font-size: 22px;
-        font-weight: 800;
+    .terminal-stat-val {
+        font-size: 20px;
+        font-weight: 700;
         color: #10B981;
     }
-    .hero-stat-lbl {
-        font-size: 11px;
-        color: #9CA3AF;
+    .terminal-stat-lbl {
+        font-size: 10px;
+        color: #64748B;
         text-transform: uppercase;
         letter-spacing: 1px;
-        margin-top: 2px;
+        margin-top: 4px;
     }
 
     .glass-card {
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.01) 100%);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border-radius: 16px;
-        padding: 20px;
-        margin-bottom: 16px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-        transition: transform 0.2s ease, border-color 0.2s ease;
-    }
-    .glass-card:hover {
-        border-color: rgba(16, 185, 129, 0.4);
-        transform: translateY(-2px);
+        background: #111522;
+        border: 1px solid #1E293B;
+        border-radius: 12px;
+        padding: 18px;
+        margin-bottom: 14px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     }
 
-    .badge-market-cyber {
-        background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-        color: #000;
-        padding: 4px 10px;
-        border-radius: 20px;
+    .badge-market {
+        background: #064E3B;
+        color: #34D399;
+        padding: 3px 10px;
+        border-radius: 6px;
         font-size: 11px;
-        font-weight: 800;
+        font-weight: 700;
         letter-spacing: 0.5px;
     }
     
-    .badge-live-cyber {
-        background: rgba(239, 68, 68, 0.2);
-        border: 1px solid rgba(239, 68, 68, 0.5);
-        color: #EF4444;
-        padding: 4px 10px;
-        border-radius: 20px;
+    .badge-status {
+        background: #1E293B;
+        color: #94A3B8;
+        padding: 3px 8px;
+        border-radius: 6px;
         font-size: 11px;
-        font-weight: 700;
+        font-weight: 600;
     }
 
-    .analysis-quote {
+    .analysis-text {
         font-size: 13px;
-        color: #D1D5DB;
-        margin-top: 10px;
+        color: #94A3B8;
+        margin-top: 8px;
         padding-left: 10px;
-        border-left: 3px solid #3B82F6;
-        font-style: italic;
+        border-left: 2px solid #3B82F6;
     }
 
     .stButton>button {
-        background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
-        color: #000000 !important;
+        background: #10B981 !important;
+        color: #050505 !important;
         border: none !important;
-        font-weight: 800 !important;
-        font-size: 15px !important;
-        border-radius: 12px !important;
-        height: 48px !important;
-        box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3) !important;
-        transition: all 0.3s ease !important;
+        font-weight: 700 !important;
+        font-size: 14px !important;
+        border-radius: 10px !important;
+        height: 44px !important;
+        width: 100% !important;
+        transition: all 0.2s ease !important;
     }
     .stButton>button:hover {
-        box-shadow: 0 6px 28px rgba(16, 185, 129, 0.6) !important;
-        transform: scale(1.01) !important;
+        background: #059669 !important;
     }
     </style>
 """,
@@ -154,38 +133,34 @@ if "authenticated_user" not in st.session_state:
 if not st.session_state.authenticated_user:
     st.markdown(
         """
-        <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
-            <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                🟢 ALPHASTAKE v5.3 | PARALLEL LIVE FEED ENGINE
-            </div>
-            <h1 class="brand-title-cyber">ALPHASTAKE</h1>
-            <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
-                Strict 17-League Real-Time Scraper — Zero Mock Games.
+        <div style="text-align: center; margin-top: 60px; margin-bottom: 30px;">
+            <h1 class="brand-title-terminal">ALPHASTAKE</h1>
+            <p style="color: #64748B; font-size: 14px; margin-top: 6px;">
+                Secure Institutional Sports Analytics & Terminal
             </p>
         </div>
     """,
         unsafe_allow_html=True,
     )
 
-    tab_login, tab_signup = st.tabs(["🔐 Sign In", "🚀 Register Account"])
+    tab_login, tab_signup = st.tabs(["Sign In", "Register"])
 
     with tab_login:
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             with st.form("login_form"):
-                user_login = st.text_input("Username", placeholder="e.g. reagan")
+                user_login = st.text_input("Username", placeholder="reagan")
                 pass_login = st.text_input("Password", type="password", placeholder="••••••••")
-                submit_login = st.form_submit_button("Launch Terminal ⚡")
+                submit_login = st.form_submit_button("Access Terminal")
 
                 if submit_login:
                     if supabase:
                         res = supabase.table("users").select("*").eq("username", user_login.strip().lower()).execute()
                         if res.data and res.data[0]["password"] == hash_password(pass_login):
                             st.session_state.authenticated_user = user_login.strip().lower()
-                            st.success("Access granted! Loading live fixtures...")
                             st.rerun()
                         else:
-                            st.error("⚠️ Invalid credentials.")
+                            st.error("Invalid credentials.")
                     else:
                         st.session_state.authenticated_user = user_login.strip().lower()
                         st.rerun()
@@ -194,9 +169,9 @@ if not st.session_state.authenticated_user:
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             with st.form("signup_form"):
-                user_new = st.text_input("Choose Username", placeholder="e.g. reagan")
+                user_new = st.text_input("Choose Username", placeholder="reagan")
                 pass_new = st.text_input("Choose Password", type="password", placeholder="••••••••")
-                submit_signup = st.form_submit_button("Create Terminal Pass 🚀")
+                submit_signup = st.form_submit_button("Create Account")
 
                 if submit_signup:
                     if len(user_new.strip()) < 3 or len(pass_new) < 4:
@@ -204,13 +179,13 @@ if not st.session_state.authenticated_user:
                     elif supabase:
                         res = supabase.table("users").select("*").eq("username", user_new.strip().lower()).execute()
                         if res.data:
-                            st.error("Username taken! Try another.")
+                            st.error("Username already exists.")
                         else:
                             supabase.table("users").insert({
                                 "username": user_new.strip().lower(),
                                 "password": hash_password(pass_new)
                             }).execute()
-                            st.success("Account created! Log in to access terminal.")
+                            st.success("Account created. Please sign in.")
                     else:
                         st.session_state.authenticated_user = user_new.strip().lower()
                         st.rerun()
@@ -261,7 +236,7 @@ def recalculate_ai_weights(history):
             elif status == "Lost":
                 m_weights[mkt] = max(round(m_weights[mkt] - 0.22, 2), 0.20)
                 l_weights[lg] = max(round(l_weights[lg] - 0.15, 2), 0.30)
-                lessons.append(f"⚠️ Penalized `{mkt}` in **{lg}** after Ticket #{ticket['id']} loss (Weight -> {m_weights[mkt]}x)")
+                lessons.append(f"Penalized `{mkt}` in {lg} after Ticket #{ticket['id']} loss")
 
     st.session_state.market_weights = m_weights
     st.session_state.league_weights = l_weights
@@ -272,18 +247,18 @@ st.markdown(
     f"""
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
         <div>
-            <h1 class="brand-title-cyber" style="font-size: 32px;">ALPHASTAKE</h1>
-            <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
+            <h1 class="brand-title-terminal">ALPHASTAKE</h1>
+            <span style="font-size: 12px; color: #64748B;">Operator Session Active</span>
         </div>
-        <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🟢 LIVE 17-LEAGUE REAL FEED
+        <div style="background: #111522; border: 1px solid #1E293B; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; color: #10B981;">
+            SECURE GATEWAY
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
-# --- EXACT 17-LEAGUE WHITELIST & ESPN ENDPOINT SLUGS ---
+# --- 17-LEAGUE WHITELIST & ENDPOINTS ---
 EXACT_17_LEAGUES = {
     "eng.1": "English Premier League",
     "fra.1": "Ligue 1",
@@ -305,7 +280,7 @@ EXACT_17_LEAGUES = {
 }
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
     "Accept": "application/json",
 }
 
@@ -317,10 +292,9 @@ def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.02):
     return max(min(round(raw_odds, 2), 1.55), 1.12)
 
 def _fetch_single_endpoint(slug, clean_league_name, date_str):
-    """Fetches a single league + single date cleanly."""
     url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={date_str}"
     try:
-        res = requests.get(url, headers=HEADERS, timeout=6)
+        res = requests.get(url, headers=HEADERS, timeout=5)
         if res.status_code == 200:
             return clean_league_name, res.json().get("events", [])
     except Exception:
@@ -332,7 +306,6 @@ def fetch_real_life_matches():
     analyzed_matches = {}
     league_counts = {name: 0 for name in EXACT_17_LEAGUES.values()}
     today = datetime.now()
-    # Single daily dates across today and next 4 days (avoids broken ESPN hyphenated range queries)
     dates_to_fetch = [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(0, 5)]
 
     blacklisted_terms = ["usl", "mls", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth"]
@@ -445,54 +418,49 @@ recalculate_ai_weights(st.session_state.slip_history)
 # --- Hero Stats ---
 top_learned_market = max(st.session_state.market_weights.items(), key=lambda x: x[1])
 col_s1, col_s2, col_s3 = st.columns(3)
-col_s1.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{top_learned_market[1]:.2f}x</div><div class="hero-stat-lbl">Top Market Boost</div></div>', unsafe_allow_html=True)
-col_s2.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(MATCH_POOL)}</div><div class="hero-stat-lbl">Real Fixtures Live</div></div>', unsafe_allow_html=True)
-col_s3.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(st.session_state.mistake_log)}</div><div class="hero-stat-lbl">Lessons Learned</div></div>', unsafe_allow_html=True)
+col_s1.markdown(f'<div class="terminal-stat-card"><div class="terminal-stat-val">{top_learned_market[1]:.2f}x</div><div class="terminal-stat-lbl">Top Market Weight</div></div>', unsafe_allow_html=True)
+col_s2.markdown(f'<div class="terminal-stat-card"><div class="terminal-stat-val">{len(MATCH_POOL)}</div><div class="terminal-stat-lbl">Active Fixtures</div></div>', unsafe_allow_html=True)
+col_s3.markdown(f'<div class="terminal-stat-card"><div class="terminal-stat-val">{len(st.session_state.mistake_log)}</div><div class="terminal-stat-lbl">Neural Penalties</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- Sidebar Controls & Live Feed Diagnostics ---
-if st.sidebar.button("🔄 Refresh Live Fixtures"):
+# --- Sidebar Controls ---
+if st.sidebar.button("Refresh Feed Cache"):
     st.cache_data.clear()
     st.rerun()
 
-if st.sidebar.button("🔒 Logout Terminal"):
+if st.sidebar.button("Lock Terminal Session"):
     st.session_state.authenticated_user = None
     st.rerun()
 
-if st.sidebar.button("🧹 Reset AI Memory Weights"):
+if st.sidebar.button("Reset Neural Weights"):
     st.session_state.market_weights = DEFAULT_MARKET_WEIGHTS.copy()
     st.session_state.league_weights = {}
     st.session_state.mistake_log = []
-    st.sidebar.success("AI memory reset to baseline 1.0x!")
+    st.sidebar.success("Weights reset to baseline.")
 
-with st.sidebar.expander("📡 Live Feed Breakdown (17 Leagues)", expanded=True):
+with st.sidebar.expander("League Feed Status (17 Leagues)", expanded=False):
     active_leagues = {k: v for k, v in LEAGUE_COUNTS.items() if v > 0}
     if active_leagues:
         for lg_name, count in sorted(active_leagues.items(), key=lambda x: x[1], reverse=True):
-            st.markdown(f"✅ **{lg_name}**: `{count}` matches")
+            st.markdown(f"• **{lg_name}**: `{count}`")
     else:
-        st.warning("0 matches returned across endpoints.")
+        st.warning("No active fixtures currently returned.")
 
 # --- Configuration Panel ---
-st.markdown("### ⚙️ Real-Life 17-League Slip Generator")
+st.markdown("### Terminal Slip Generator")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
-    target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
+    target_odds = st.number_input("Target Total Odds:", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
 with col_cfg2:
     stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, value=5000, step=500)
 
 st.markdown("<br>", unsafe_allow_html=True)
-col1, col2 = st.columns(2)
-with col1:
-    generate_clicked = st.button("Generate Smart Slip 🧠")
-with col2:
-    sure_clicked = st.button("sure")
 
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "Real-Life 17-League Betslip"
+    st.session_state.slip_title = "Accumulator Slip"
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -517,10 +485,9 @@ def record_slip(legs, title, odds, stake, payout):
         except Exception:
             pass
 
-# --- Generation Logic ---
-if generate_clicked or sure_clicked:
+if st.button("Generate Smart Terminal Slip"):
     if not MATCH_POOL:
-        st.error("⚠️ ESPN returned 0 active fixtures for today/next 4 days across the 17 endpoints. Check the sidebar 'Live Feed Breakdown' or try again shortly.")
+        st.error("No active fixtures found across the 17 whitelisted leagues in the current window.")
     else:
         scored_pool = []
         for m in MATCH_POOL:
@@ -542,7 +509,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"🧠 REAL-LIFE 17-LEAGUE SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"PROBABILITY ACCUMULATOR SLIP"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -553,7 +520,7 @@ if generate_clicked or sure_clicked:
 
 # --- Active Betslip Display ---
 st.markdown("---")
-st.subheader(f"📋 {st.session_state.slip_title}")
+st.subheader(st.session_state.slip_title)
 
 if st.session_state.generated_slip:
     total_odds = 1.0
@@ -565,13 +532,13 @@ if st.session_state.generated_slip:
 
     st.markdown(
         f"""
-        <div class="glass-card" style="border-color: rgba(16, 185, 129, 0.5);">
+        <div class="glass-card" style="border-color: #059669;">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; color: #10B981; font-size: 24px;">Odds: {round(total_odds, 2)}x</h3>
-                <span style="color: #3B82F6; font-weight: 700;">+{bonus}% Accumulator Bonus</span>
+                <h3 style="margin: 0; color: #10B981; font-size: 22px;">Total Odds: {round(total_odds, 2)}x</h3>
+                <span style="color: #3B82F6; font-weight: 600; font-size: 13px;">+{bonus}% Accumulator Bonus</span>
             </div>
-            <p style="margin: 10px 0 0 0; font-size: 15px; color: #E5E7EB;">
-                Stake: <b>{stake_amount:,.0f} UGX</b> &nbsp;|&nbsp; 
+            <p style="margin: 8px 0 0 0; font-size: 14px; color: #94A3B8;">
+                Stake: <b style="color: #F8FAFC;">{stake_amount:,.0f} UGX</b> &nbsp;|&nbsp; 
                 Est. Return: <b style="color: #10B981;">{final_payout:,.0f} UGX</b>
             </p>
         </div>
@@ -579,7 +546,7 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE REAL-LIFE 17-LEAGUE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"*ALPHASTAKE ACCUMULATOR SLIP*\nOdds: {round(total_odds, 2)}x | Stake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
@@ -589,21 +556,21 @@ if st.session_state.generated_slip:
         a_s = live_match.get("away_score", 0)
         ai_w = leg.get("ai_weight", st.session_state.market_weights.get(leg.get("market"), 1.0))
         
-        status_badge = f'<span class="badge-live-cyber">🟢 LIVE ({h_s} - {a_s})</span>' if "In Progress" in status or "Half" in status else (f'🏁 FT ({h_s} - {a_s})' if "Final" in status or "FT" in status else f"📅 {kickoff}")
+        status_tag = f"LIVE ({h_s} - {a_s})" if "In Progress" in status or "Half" in status else (f"FT ({h_s} - {a_s})" if "Final" in status or "FT" in status else kickoff)
         
         st.markdown(
             f"""
             <div class="glass-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <b style="font-size: 16px; color: #FFF;">Leg {i}: {leg.get('home')} vs {leg.get('away')}</b>
-                    {status_badge}
+                    <b style="font-size: 15px; color: #F8FAFC;">{i}. {leg.get('home')} vs {leg.get('away')}</b>
+                    <span class="badge-status">{status_tag}</span>
                 </div>
-                <div style="font-size: 12px; color: #10B981; margin-bottom: 4px; font-weight: 700;">🏆 {leg.get('league')} &nbsp;|&nbsp; 🧠 Learned Confidence: {ai_w:.2f}x</div>
+                <div style="font-size: 11px; color: #10B981; margin-bottom: 4px; font-weight: 600;">{leg.get('league')} &nbsp;|&nbsp; Weight: {ai_w:.2f}x</div>
                 <div style="margin: 6px 0;">
-                    Selection: <span class="badge-market-cyber">{leg.get('market')}</span> &nbsp; Odds: <b style="color: #10B981;">{leg.get('odds')}</b>
+                    Selection: <span class="badge-market">{leg.get('market')}</span> &nbsp; Odds: <b style="color: #10B981;">{leg.get('odds')}</b>
                 </div>
-                <div style="font-size: 12px; color: #9CA3AF; margin-top: 4px;">Model xG Projection: {leg.get('xg')}</div>
-                <div class="analysis-quote">💡 <b>AI Logic:</b> {leg.get('analysis')}</div>
+                <div style="font-size: 11px; color: #64748B; margin-top: 4px;">xG Projection: {leg.get('xg')}</div>
+                <div class="analysis-text"><b>AI Logic:</b> {leg.get('analysis')}</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -612,12 +579,12 @@ if st.session_state.generated_slip:
 
     encoded_text = urllib.parse.quote(slip_text)
     whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
-    st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 14px 20px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 16px; margin-bottom: 15px; box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);">💬 Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
-    st.text_area("📋 Copy Booking Text", slip_text, height=120)
+    st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background: #10B981; color: #050505; padding: 12px 20px; border-radius: 10px; text-align: center; font-weight: 700; font-size: 14px; margin-bottom: 14px;">Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
+    st.text_area("Booking Text Output", slip_text, height=110)
 
 # --- Profit & Loss Dashboard ---
 st.markdown("---")
-st.subheader("📊 Session P&L Performance Tracker")
+st.subheader("Session P&L Analytics")
 
 total_staked = sum(ticket["stake"] for ticket in st.session_state.slip_history)
 total_won_payouts = sum(ticket["payout"] for ticket in st.session_state.slip_history if ticket["status"] == "Won")
@@ -628,16 +595,16 @@ win_rate = (len([t for t in settled_tickets if t["status"] == "Won"]) / len(sett
 roi = (net_pnl / total_staked * 100) if total_staked > 0 else 0.0
 
 col_p1, col_p2, col_p3 = st.columns(3)
-col_p1.metric("Net Profit / Loss", f"{net_pnl:+,.0f} UGX", delta=f"{roi:.1f}% ROI")
+col_p1.metric("Net P&L", f"{net_pnl:+,.0f} UGX", delta=f"{roi:.1f}% ROI")
 col_p2.metric("Total Staked", f"{total_staked:,.0f} UGX")
 col_p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len([t for t in settled_tickets if t['status']=='Won'])}/{len(settled_tickets)} Settled")
 
-# --- Interactive History Log with Settlement Buttons ---
+# --- Interactive History Log ---
 st.markdown("<br>", unsafe_allow_html=True)
-st.subheader(f"📜 Terminal History (@{st.session_state.authenticated_user})")
+st.subheader("Terminal History & Training")
 
 if st.session_state.slip_history:
-    if st.button("🗑️ Clear History Log"):
+    if st.button("Clear History Log"):
         st.session_state.slip_history = []
         if supabase and st.session_state.authenticated_user:
             supabase.table("user_tickets").delete().eq("username", st.session_state.authenticated_user).execute()
@@ -646,32 +613,30 @@ if st.session_state.slip_history:
 
     for idx, past_slip in enumerate(st.session_state.slip_history):
         status_label = past_slip['status']
-        badge_icon = "⏳" if status_label == "Pending" else ("✅" if status_label == "Won" else "❌")
+        status_tag = "Pending" if status_label == "Pending" else ("Won" if status_label == "Won" else "Lost")
         
-        with st.expander(f"Ticket #{past_slip['id']} | {past_slip['title']} ({past_slip['odds']}x) — [{badge_icon} {status_label}]"):
+        with st.expander(f"Ticket #{past_slip['id']} | {past_slip['odds']}x — [{status_tag}]"):
             st.markdown(f"**Stake:** {past_slip['stake']:,} UGX | **Est Payout:** **{past_slip['payout']:,.0f} UGX**")
             
             btn_col1, btn_col2, btn_col3 = st.columns(3)
             with btn_col1:
-                if st.button("✅ Mark Won (+Boost)", key=f"won_{idx}"):
+                if st.button("Mark Won", key=f"won_{idx}"):
                     st.session_state.slip_history[idx]["status"] = "Won"
                     recalculate_ai_weights(st.session_state.slip_history)
                     st.rerun()
             with btn_col2:
-                if st.button("❌ Mark Lost (-Penalize)", key=f"lost_{idx}"):
+                if st.button("Mark Lost", key=f"lost_{idx}"):
                     st.session_state.slip_history[idx]["status"] = "Lost"
                     recalculate_ai_weights(st.session_state.slip_history)
                     st.rerun()
             with btn_col3:
-                if st.button("⏳ Reset Pending", key=f"pend_{idx}"):
+                if st.button("Reset Pending", key=f"pend_{idx}"):
                     st.session_state.slip_history[idx]["status"] = "Pending"
                     recalculate_ai_weights(st.session_state.slip_history)
                     st.rerun()
 
             st.markdown("---")
             for leg_idx, l in enumerate(past_slip["legs"], 1):
-                match_key = f"{l.get('home')} vs {l.get('away')}"
-                live_leg = MATCH_POOL_DICT.get(match_key, l)
-                st.markdown(f"&nbsp;&nbsp;{leg_idx}. **{l.get('home')} vs {l.get('away')}** -> `{l.get('market')}` @ **{l.get('odds')}** *(Score: {live_leg.get('home_score', 0)} - {live_leg.get('away_score', 0)})*")
+                st.markdown(f"&nbsp;&nbsp;{leg_idx}. {l.get('home')} vs {l.get('away')} -> {l.get('market')} @ {l.get('odds')}")
 else:
-    st.caption("No account tickets found. Generate a slip above and mark it Won/Lost to train AlphaStake!")
+    st.caption("No account tickets generated yet.")
