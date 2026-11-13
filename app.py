@@ -8,8 +8,8 @@ from supabase import create_client, Client
 
 # --- Page Setup ---
 st.set_page_config(
-    page_title="AlphaStake | Elite Pro & International Terminal",
-    page_icon="⚽",
+    page_title="AlphaStake | Adaptive Self-Learning Terminal",
+    page_icon="🧠",
     layout="centered",
 )
 
@@ -133,7 +133,7 @@ st.markdown(
         font-weight: 800 !important;
         font-size: 15px !important;
         border-radius: 12px !important;
-        height: 50px !important;
+        height: 48px !important;
         box-shadow: 0 4px 20px rgba(16, 185, 129, 0.3) !important;
         transition: all 0.3s ease !important;
     }
@@ -155,11 +155,11 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                ⚡ ALPHASTAKE v3.0 | 12 ELITE LEAGUES & INTERNATIONAL
+                🧠 ALPHASTAKE v4.0 | SELF-LEARNING AI ENGINE
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
-                Elite Professional & International Intelligence Terminal.
+                Adaptive Reinforcement Terminal — Learns From Every Win & Loss.
             </p>
         </div>
     """,
@@ -181,7 +181,7 @@ if not st.session_state.authenticated_user:
                         res = supabase.table("users").select("*").eq("username", user_login.strip().lower()).execute()
                         if res.data and res.data[0]["password"] == hash_password(pass_login):
                             st.session_state.authenticated_user = user_login.strip().lower()
-                            st.success(f"Access granted! Syncing terminal...")
+                            st.success("Access granted! Syncing neural weights...")
                             st.rerun()
                         else:
                             st.error("⚠️ Invalid credentials.")
@@ -215,6 +215,58 @@ if not st.session_state.authenticated_user:
                         st.rerun()
     st.stop()
 
+# --- Initialize Self-Learning Weights ---
+DEFAULT_MARKET_WEIGHTS = {
+    "Double Chance X2": 1.0,
+    "Double Chance 1X": 1.0,
+    "Over 1.5 Match Goals": 1.0,
+    "Both Teams to Score (BTTS - Yes)": 1.0,
+    "Draw No Bet (Home)": 1.0,
+    "Draw No Bet (Away)": 1.0,
+    "Home Team Over 0.5 Goals": 1.0,
+}
+
+if "market_weights" not in st.session_state:
+    st.session_state.market_weights = DEFAULT_MARKET_WEIGHTS.copy()
+
+if "league_weights" not in st.session_state:
+    st.session_state.league_weights = {}
+
+if "mistake_log" not in st.session_state:
+    st.session_state.mistake_log = []
+
+def recalculate_ai_weights(history):
+    """Rebuilds confidence weights automatically from all settled Won/Lost tickets."""
+    m_weights = DEFAULT_MARKET_WEIGHTS.copy()
+    l_weights = {}
+    lessons = []
+
+    for ticket in reversed(history):  # Process chronologically from oldest to newest
+        status = ticket.get("status", "Pending")
+        if status not in ["Won", "Lost"]:
+            continue
+
+        for leg in ticket.get("legs", []):
+            mkt = leg.get("market", "")
+            lg = leg.get("league", "")
+
+            if mkt not in m_weights:
+                m_weights[mkt] = 1.0
+            if lg not in l_weights:
+                l_weights[lg] = 1.0
+
+            if status == "Won":
+                m_weights[mkt] = min(round(m_weights[mkt] + 0.15, 2), 2.0)
+                l_weights[lg] = min(round(l_weights[lg] + 0.10, 2), 1.8)
+            elif status == "Lost":
+                m_weights[mkt] = max(round(m_weights[mkt] - 0.22, 2), 0.20)
+                l_weights[lg] = max(round(l_weights[lg] - 0.15, 2), 0.30)
+                lessons.append(f"⚠️ Penalized `{mkt}` in **{lg}** after Ticket #{ticket['id']} loss (Weight -> {m_weights[mkt]}x)")
+
+    st.session_state.market_weights = m_weights
+    st.session_state.league_weights = l_weights
+    st.session_state.mistake_log = list(reversed(lessons))[:6]
+
 # --- Post-Login Header ---
 st.markdown(
     f"""
@@ -224,23 +276,12 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🟢 12 ELITE LEAGUES + INTL ACTIVE
+            🧠 ADAPTIVE LEARNING ON
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
-
-col_s1, col_s2, col_s3 = st.columns(3)
-col_s1.markdown('<div class="hero-stat-card"><div class="hero-stat-val">9.9/10</div><div class="hero-stat-lbl">Safety Index</div></div>', unsafe_allow_html=True)
-col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">12 Leags</div><div class="hero-stat-lbl">Pro + International</div></div>', unsafe_allow_html=True)
-col_s3.markdown('<div class="hero-stat-card"><div class="hero-stat-val">SYNC</div><div class="hero-stat-lbl">Cloud Database Active</div></div>', unsafe_allow_html=True)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-if st.sidebar.button("🔒 Logout Terminal"):
-    st.session_state.authenticated_user = None
-    st.rerun()
 
 # --- COMBINED WHITELIST DICTIONARY (Original 10 Pro Leagues + International Break) ---
 COMBINED_WHITELIST = {
@@ -331,11 +372,7 @@ def fetch_analyzed_matches():
                                 away_xg = round(random.uniform(0.9, 2.4), 2)
                                 total_projected_xg = home_xg + away_xg
 
-                                market_roll = random.choice([
-                                    "Double Chance X2", "Double Chance 1X", "Over 1.5 Match Goals",
-                                    "Both Teams to Score (BTTS - Yes)", "Draw No Bet (Home)",
-                                    "Draw No Bet (Away)", "Home Team Over 0.5 Goals"
-                                ])
+                                market_roll = random.choice(list(DEFAULT_MARKET_WEIGHTS.keys()))
 
                                 if market_roll == "Double Chance X2" and away_xg >= home_xg - 0.2:
                                     market = "Double Chance X2"
@@ -414,7 +451,7 @@ MATCH_POOL = list(MATCH_POOL_DICT.values())
 if "slip_history" not in st.session_state:
     st.session_state.slip_history = []
 
-if supabase and st.session_state.authenticated_user:
+if supabase and st.session_state.authenticated_user and not st.session_state.slip_history:
     try:
         saved_db_slips = supabase.table("user_tickets").select("*").eq("username", st.session_state.authenticated_user).order("created_at", desc=True).execute()
         if saved_db_slips.data:
@@ -422,8 +459,30 @@ if supabase and st.session_state.authenticated_user:
     except Exception:
         pass
 
+# Sync AI weights with existing history
+recalculate_ai_weights(st.session_state.slip_history)
+
+# --- Hero Stats ---
+top_learned_market = max(st.session_state.market_weights.items(), key=lambda x: x[1])
+col_s1, col_s2, col_s3 = st.columns(3)
+col_s1.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{top_learned_market[1]:.2f}x</div><div class="hero-stat-lbl">Top Market Boost</div></div>', unsafe_allow_html=True)
+col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">12 Leags</div><div class="hero-stat-lbl">Pro + International</div></div>', unsafe_allow_html=True)
+col_s3.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(st.session_state.mistake_log)}</div><div class="hero-stat-lbl">Lessons Learned</div></div>', unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+if st.sidebar.button("🔒 Logout Terminal"):
+    st.session_state.authenticated_user = None
+    st.rerun()
+
+if st.sidebar.button("🔄 Reset AI Memory Weights"):
+    st.session_state.market_weights = DEFAULT_MARKET_WEIGHTS.copy()
+    st.session_state.league_weights = {}
+    st.session_state.mistake_log = []
+    st.sidebar.success("AI memory reset to baseline 1.0x!")
+
 # --- Configuration Panel ---
-st.markdown("### ⚙️ Elite Terminal Generator (12 Leagues + International)")
+st.markdown("### ⚙️ Adaptive Terminal Generator")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
     target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
@@ -433,14 +492,14 @@ with col_cfg2:
 st.markdown("<br>", unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
-    generate_clicked = st.button("Generate Elite Slip 🚀")
+    generate_clicked = st.button("Generate Smart Slip 🧠")
 with col2:
     sure_clicked = st.button("sure")
 
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "12-League & International Betslip"
+    st.session_state.slip_title = "Adaptive AI Betslip"
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -465,25 +524,37 @@ def record_slip(legs, title, odds, stake, payout):
         except Exception:
             pass
 
-# Generation Logic
+# --- Adaptive Weighted Generation Logic ---
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
         st.warning("⚠️ No active fixtures found.")
     else:
-        # Prioritize international break and top pro matches
-        priority_pool = [m for m in MATCH_POOL if "Nations" in m["league"] or "CAF" in m["league"] or "International" in m["league"]]
-        other_pool = [m for m in MATCH_POOL if m not in priority_pool]
-        cautious_pool = priority_pool + other_pool
+        scored_pool = []
+        for m in MATCH_POOL:
+            m_weight = st.session_state.market_weights.get(m["market"], 1.0)
+            l_weight = st.session_state.league_weights.get(m["league"], 1.0)
+            intl_bonus = 1.15 if ("Nations" in m["league"] or "CAF" in m["league"] or "International" in m["league"]) else 1.0
+            
+            # Score combines base trust with learned market & league weights
+            ai_score = m["trust"] * m_weight * l_weight * intl_bonus * random.uniform(0.95, 1.05)
+            scored_pool.append((ai_score, m_weight, m))
+
+        # Sort highest learned confidence first!
+        scored_pool.sort(key=lambda x: x[0], reverse=True)
 
         selected_legs, current_prod = [], 1.0
-
-        for match in cautious_pool:
+        for ai_score, m_weight, match in scored_pool:
+            # Skip heavily penalized markets (< 0.45x) unless pool is exhausted
+            if m_weight < 0.45 and len(scored_pool) > 4:
+                continue
             if current_prod < target_odds and len(selected_legs) < 10:
-                selected_legs.append(match)
+                match_copy = match.copy()
+                match_copy["ai_weight"] = m_weight
+                selected_legs.append(match_copy)
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"⚽ 12-LEAGUE & INTL SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"🧠 ADAPTIVE AI SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -520,13 +591,14 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE 12-LEAGUE & INTL SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE ADAPTIVE AI SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
         status = live_match.get("status", "Scheduled")
         h_s = live_match.get("home_score", 0)
         a_s = live_match.get("away_score", 0)
+        ai_w = leg.get("ai_weight", st.session_state.market_weights.get(leg.get("market"), 1.0))
         
         status_badge = f'<span class="badge-live-cyber">🟢 LIVE ({h_s} - {a_s})</span>' if "In Progress" in status or "Half" in status else (f'🏁 FT ({h_s} - {a_s})' if "Final" in status or "FT" in status else f"⏳ {status}")
         
@@ -537,7 +609,7 @@ if st.session_state.generated_slip:
                     <b style="font-size: 16px; color: #FFF;">Leg {i}: {leg.get('home')} vs {leg.get('away')}</b>
                     {status_badge}
                 </div>
-                <div style="font-size: 12px; color: #10B981; margin-bottom: 4px; font-weight: 700;">🏆 {leg.get('league')}</div>
+                <div style="font-size: 12px; color: #10B981; margin-bottom: 4px; font-weight: 700;">🏆 {leg.get('league')} &nbsp;|&nbsp; 🧠 Learned Confidence: {ai_w:.2f}x</div>
                 <div style="margin: 6px 0;">
                     Selection: <span class="badge-market-cyber">{leg.get('market')}</span> &nbsp; Odds: <b style="color: #10B981;">{leg.get('odds')}</b>
                 </div>
@@ -553,6 +625,23 @@ if st.session_state.generated_slip:
     whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
     st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 14px 20px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 16px; margin-bottom: 15px; box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);">💬 Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
     st.text_area("📋 Copy Booking Text", slip_text, height=120)
+
+# --- Neural Self-Learning Diagnostics ---
+st.markdown("---")
+st.subheader("🧠 AI Self-Learning Memory & Market Confidence")
+st.caption("Mark tickets as Won or Lost below — AlphaStake automatically boosts winning markets and penalizes losing ones.")
+
+w_cols = st.columns(2)
+sorted_weights = sorted(st.session_state.market_weights.items(), key=lambda x: x[1], reverse=True)
+for idx, (mkt_name, weight_val) in enumerate(sorted_weights):
+    with w_cols[idx % 2]:
+        color = "#10B981" if weight_val > 1.0 else ("#EF4444" if weight_val < 1.0 else "#9CA3AF")
+        st.markdown(f"**{mkt_name}:** <span style='color:{color}; font-weight:800;'>{weight_val:.2f}x</span>", unsafe_allow_html=True)
+
+if st.session_state.mistake_log:
+    with st.expander("📉 Recent Mistakes Analyzed & Penalized"):
+        for lesson in st.session_state.mistake_log:
+            st.markdown(lesson)
 
 # --- Profit & Loss Dashboard ---
 st.markdown("---")
@@ -571,15 +660,16 @@ col_p1.metric("Net Profit / Loss", f"{net_pnl:+,.0f} UGX", delta=f"{roi:.1f}% RO
 col_p2.metric("Total Staked", f"{total_staked:,.0f} UGX")
 col_p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len([t for t in settled_tickets if t['status']=='Won'])}/{len(settled_tickets)} Settled")
 
-# --- Interactive History Log ---
+# --- Interactive History Log with Settlement Buttons ---
 st.markdown("<br>", unsafe_allow_html=True)
-st.subheader(f"📜 Terminal History (@{st.session_state.authenticated_user})")
+st.subheader(f"📜 Terminal History & Feedback Training (@{st.session_state.authenticated_user})")
 
 if st.session_state.slip_history:
     if st.button("🗑️ Clear History Log"):
         st.session_state.slip_history = []
         if supabase and st.session_state.authenticated_user:
             supabase.table("user_tickets").delete().eq("username", st.session_state.authenticated_user).execute()
+        recalculate_ai_weights([])
         st.rerun()
 
     for idx, past_slip in enumerate(st.session_state.slip_history):
@@ -588,10 +678,29 @@ if st.session_state.slip_history:
         
         with st.expander(f"Ticket #{past_slip['id']} | {past_slip['title']} ({past_slip['odds']}x) — [{badge_icon} {status_label}]"):
             st.markdown(f"**Stake:** {past_slip['stake']:,} UGX | **Est Payout:** **{past_slip['payout']:,.0f} UGX**")
+            
+            # Settlement Buttons to Train the AI
+            btn_col1, btn_col2, btn_col3 = st.columns(3)
+            with btn_col1:
+                if st.button("✅ Mark Won (+Boost)", key=f"won_{idx}"):
+                    st.session_state.slip_history[idx]["status"] = "Won"
+                    recalculate_ai_weights(st.session_state.slip_history)
+                    st.rerun()
+            with btn_col2:
+                if st.button("❌ Mark Lost (-Penalize)", key=f"lost_{idx}"):
+                    st.session_state.slip_history[idx]["status"] = "Lost"
+                    recalculate_ai_weights(st.session_state.slip_history)
+                    st.rerun()
+            with btn_col3:
+                if st.button("⏳ Reset Pending", key=f"pend_{idx}"):
+                    st.session_state.slip_history[idx]["status"] = "Pending"
+                    recalculate_ai_weights(st.session_state.slip_history)
+                    st.rerun()
+
             st.markdown("---")
             for leg_idx, l in enumerate(past_slip["legs"], 1):
                 match_key = f"{l.get('home')} vs {l.get('away')}"
                 live_leg = MATCH_POOL_DICT.get(match_key, l)
                 st.markdown(f"&nbsp;&nbsp;{leg_idx}. **{l.get('home')} vs {l.get('away')}** -> `{l.get('market')}` @ **{l.get('odds')}** *(Score: {live_leg.get('home_score', 0)} - {live_leg.get('away_score', 0)})*")
 else:
-    st.caption("No account tickets found. Generate a slip above to save it to your terminal history!")
+    st.caption("No account tickets found. Generate a slip above and mark it Won/Lost to train AlphaStake!")
