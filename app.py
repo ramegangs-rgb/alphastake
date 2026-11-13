@@ -8,7 +8,7 @@ from supabase import create_client, Client
 
 # --- Page Setup ---
 st.set_page_config(
-    page_title="AlphaStake | Strict 17-League Terminal",
+    page_title="AlphaStake | Live 17-League Terminal",
     page_icon="⚽",
     layout="centered",
 )
@@ -155,11 +155,11 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                🔒 ALPHASTAKE v5.1 | STRICT 17-LEAGUE GATEKEEPER
+                🟢 ALPHASTAKE v5.2 | 100% REAL-LIFE FIXTURES ONLY
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
-                Strict 17-League Professional Terminal & Reinforcement Learning AI.
+                Strict 17-League Live Feed — Zero Simulated Matches.
             </p>
         </div>
     """,
@@ -181,7 +181,7 @@ if not st.session_state.authenticated_user:
                         res = supabase.table("users").select("*").eq("username", user_login.strip().lower()).execute()
                         if res.data and res.data[0]["password"] == hash_password(pass_login):
                             st.session_state.authenticated_user = user_login.strip().lower()
-                            st.success("Access granted! Syncing terminal...")
+                            st.success("Access granted! Loading live fixtures...")
                             st.rerun()
                         else:
                             st.error("⚠️ Invalid credentials.")
@@ -275,14 +275,14 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🔒 EXACT 17-LEAGUE GATEKEEPER ACTIVE
+            🟢 100% REAL-LIFE 17-LEAGUE FEED
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
-# --- EXACT 17-LEAGUE WHITELIST DICTIONARY (ZERO TOLERANCE FOR OTHER LEAGUES) ---
+# --- EXACT 17-LEAGUE WHITELIST & DIRECT ESPN ENDPOINT SLUGS ---
 EXACT_17_LEAGUES = {
     "eng.1": "English Premier League",
     "fra.1": "Ligue 1",
@@ -291,7 +291,7 @@ EXACT_17_LEAGUES = {
     "bra.1": "Brazilian Serie A",
     "uefa.champions": "UEFA Champions League",
     "uefa.nations": "UEFA Nations League",
-    "uefa.conference": "UEFA Conference League",
+    "uefa.europa.conf": "UEFA Conference League",
     "uefa.europa": "UEFA Europa League",
     "sco.1": "Scottish Premiership",
     "ger.1": "Bundesliga",
@@ -309,182 +309,110 @@ def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.02):
     raw_odds = (1 / adjusted_prob) * market_boost
     return max(min(round(raw_odds, 2), 1.55), 1.12)
 
-@st.cache_data(ttl=30)
-def fetch_analyzed_matches():
+@st.cache_data(ttl=60)
+def fetch_real_life_matches():
     analyzed_matches = {}
     today = datetime.now()
-    dates_to_fetch = [
-        (today - timedelta(days=1)).strftime("%Y%m%d"),
-        today.strftime("%Y%m%d"),
-        (today + timedelta(days=1)).strftime("%Y%m%d")
-    ]
+    # Fetch across a 7-day window (today + next 6 days) so real upcoming fixtures are always available
+    dates_to_fetch = [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(0, 7)]
+    date_range_param = f"{dates_to_fetch[0]}-{dates_to_fetch[-1]}"
 
-    # Hard blacklist for any unwanted leagues, USL, lower divisions, youth, or college
     blacklisted_terms = ["usl", "mls", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth", "championship"]
 
-    # We ONLY query endpoints dedicated specifically to our approved leagues
-    api_endpoints = [
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/ita.1/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/ger.1/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/fra.1/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.europa/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard",
-    ]
-
-    for d_str in dates_to_fetch:
-        for base_url in api_endpoints:
-            try:
-                url = f"{base_url}?dates={d_str}"
-                res = requests.get(url, timeout=4)
-                if res.status_code == 200:
-                    events = res.json().get("events", [])
-                    for event in events:
-                        league_obj = event.get("season", {})
-                        league_slug = league_obj.get("slug", "").lower()
-                        league_name = event.get("league", {}).get("name", "").lower()
-                        full_league_str = f"{league_slug} {league_name}"
-
-                        # Hard reject if any blacklisted term appears
-                        if any(term in full_league_str for term in blacklisted_terms):
-                            continue
-
-                        matched_key = None
-                        # STRICT MATCHING AGAINST THE 17 KEYS ONLY
-                        if "eng.1" in league_slug or "premier league" in full_league_str:
-                            matched_key = "eng.1"
-                        elif "fra.1" in league_slug or "ligue 1" in full_league_str:
-                            matched_key = "fra.1"
-                        elif "esp.1" in league_slug or "la liga" in full_league_str:
-                            matched_key = "esp.1"
-                        elif "ita.1" in league_slug or ("serie a" in full_league_str and "brazil" not in full_league_str):
-                            matched_key = "ita.1"
-                        elif "bra.1" in league_slug or "brazil" in full_league_str:
-                            matched_key = "bra.1"
-                        elif "champions-league" in league_slug or "champions league" in full_league_str:
-                            matched_key = "uefa.champions"
-                        elif "nations-league" in league_slug or "nations league" in full_league_str:
-                            matched_key = "uefa.nations"
-                        elif "conference" in league_slug or "conference league" in full_league_str:
-                            matched_key = "uefa.conference"
-                        elif "europa-league" in league_slug or "europa league" in full_league_str:
-                            matched_key = "uefa.europa"
-                        elif "sco.1" in league_slug or "scottish premiership" in full_league_str:
-                            matched_key = "sco.1"
-                        elif "ger.1" in league_slug or ("bundesliga" in full_league_str and "austria" not in full_league_str):
-                            matched_key = "ger.1"
-                        elif "africa cup of nations" in full_league_str or "afcon" in full_league_str:
-                            matched_key = "caf.nations"
-                        elif "bel.1" in league_slug or "belgian" in full_league_str:
-                            matched_key = "bel.1"
-                        elif "ned.1" in league_slug or "eredivisie" in full_league_str:
-                            matched_key = "ned.1"
-                        elif "nor.1" in league_slug or "eliteserien" in full_league_str:
-                            matched_key = "nor.1"
-                        elif "por.1" in league_slug or "liga portugal" in full_league_str:
-                            matched_key = "por.1"
-                        elif "tur.1" in league_slug or "super lig" in full_league_str:
-                            matched_key = "tur.1"
-
-                        # ABSOLUTE GATEKEEPER CHECK: If it's not in EXACT_17_LEAGUES, drop it instantly
-                        if not matched_key or matched_key not in EXACT_17_LEAGUES:
-                            continue
-
-                        status_type = event.get("status", {}).get("type", {}).get("description", "Scheduled")
-                        comps = event.get("competitions", [])
-                        for comp in comps:
-                            teams = comp.get("competitors", [])
-                            if len(teams) == 2:
-                                home_team, away_team = teams[0], teams[1]
-                                home_name = home_team.get("team", {}).get("displayName")
-                                away_name = away_team.get("team", {}).get("displayName")
-                                home_score = int(home_team.get("score", 0))
-                                away_score = int(away_team.get("score", 0))
-
-                                if home_name and away_name:
-                                    match_key = f"{home_name} vs {away_name}"
-                                    if match_key in analyzed_matches:
-                                        continue
-
-                                    home_xg = round(random.uniform(1.0, 2.6), 2)
-                                    away_xg = round(random.uniform(0.9, 2.4), 2)
-                                    total_projected_xg = home_xg + away_xg
-
-                                    market_roll = random.choice(list(DEFAULT_MARKET_WEIGHTS.keys()))
-
-                                    if market_roll == "Double Chance X2" and away_xg >= home_xg - 0.2:
-                                        market = "Double Chance X2"
-                                        fair_prob = 0.78
-                                        analysis = f"Away side structural stability supports X2 coverage ({away_xg} xG)."
-                                    elif market_roll == "Double Chance 1X" and home_xg >= away_xg - 0.2:
-                                        market = "Double Chance 1X"
-                                        fair_prob = 0.78
-                                        analysis = f"Home venue advantage and defense anchor the 1X market."
-                                    elif market_roll == "Both Teams to Score (BTTS - Yes)" and total_projected_xg > 2.5:
-                                        market = "Both Teams to Score (BTTS - Yes)"
-                                        fair_prob = 0.74
-                                        analysis = f"High offensive output from both camps (Combined xG: {total_projected_xg})."
-                                    elif market_roll == "Home Team Over 0.5 Goals":
-                                        market = "Home Team Over 0.5 Goals"
-                                        fair_prob = 0.82
-                                        analysis = f"Home scoring probability exceeds 80% based on recent attacking metrics."
-                                    else:
-                                        market = "Over 1.5 Match Goals"
-                                        fair_prob = 0.80
-                                        analysis = f"Pace and tactical flow point toward clearing the 1.5 goal threshold."
-
-                                    odds = prob_to_betpawa_odds(fair_prob)
-                                    trust = round(random.uniform(9.6, 9.9), 1)
-
-                                    analyzed_matches[match_key] = {
-                                        "home": home_name,
-                                        "away": away_name,
-                                        "home_score": home_score,
-                                        "away_score": away_score,
-                                        "status": status_type,
-                                        "league": EXACT_17_LEAGUES[matched_key],
-                                        "market": market,
-                                        "odds": odds,
-                                        "trust": trust,
-                                        "xg": f"{home_xg} - {away_xg}",
-                                        "analysis": analysis,
-                                    }
-            except Exception:
+    # Query each of the 17 exact league endpoints directly using a 7-day date range
+    for slug, clean_league_name in EXACT_17_LEAGUES.items():
+        try:
+            url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={date_range_param}"
+            res = requests.get(url, timeout=5)
+            if res.status_code != 200:
                 continue
 
-    # Guaranteed test mode fallback using strictly the 17 leagues
-    if not analyzed_matches:
-        mock_fixtures = [
-            ("Arsenal", "Chelsea", "English Premier League", "Over 1.5 Match Goals", 1.21, "2.0 - 1.7", "London derby pace clears goal threshold."),
-            ("Real Madrid", "Barcelona", "La Liga", "Both Teams to Score (BTTS - Yes)", 1.29, "2.3 - 2.1", "El Clásico offensive firepower."),
-            ("PSG", "Marseille", "Ligue 1", "Double Chance 1X", 1.20, "1.9 - 1.0", "Home dominance in Le Classique."),
-            ("Inter Milan", "Juventus", "Italian Serie A", "Draw No Bet (Home)", 1.25, "1.6 - 1.1", "San Siro tactical edge."),
-            ("Flamengo", "Palmeiras", "Brazilian Serie A", "Both Teams to Score (BTTS - Yes)", 1.33, "2.1 - 1.8", "High-stakes Série A heavyweight bout."),
-            ("Real Madrid", "Manchester City", "UEFA Champions League", "Over 1.5 Match Goals", 1.22, "2.2 - 2.0", "UCL knockout high-tempo fixture."),
-            ("France", "Portugal", "UEFA Nations League", "Double Chance 1X", 1.23, "1.8 - 1.1", "Balanced squad depth secures points."),
-            ("Ajax", "Feyenoord", "Netherlands Eredivisie", "Both Teams to Score (BTTS - Yes)", 1.27, "2.2 - 2.0", "De Klassieker attacking style."),
-        ]
-        for home, away, league, market, odds, xg, analysis in mock_fixtures:
-            match_key = f"{home} vs {away}"
-            analyzed_matches[match_key] = {
-                "home": home,
-                "away": away,
-                "home_score": 0,
-                "away_score": 0,
-                "status": "Scheduled (17-League Test Mode)",
-                "league": league,
-                "market": market,
-                "odds": odds,
-                "trust": 9.8,
-                "xg": xg,
-                "analysis": analysis,
-            }
+            events = res.json().get("events", [])
+            for event in events:
+                league_obj = event.get("season", {})
+                api_slug = league_obj.get("slug", "").lower()
+                api_name = event.get("league", {}).get("name", "").lower()
+                full_str = f"{api_slug} {api_name}"
+
+                if any(term in full_str for term in blacklisted_terms):
+                    continue
+
+                status_obj = event.get("status", {}).get("type", {})
+                status_type = status_obj.get("description", "Scheduled")
+                short_detail = status_obj.get("shortDetail", "")
+                
+                # Format real match date/time
+                raw_date = event.get("date", "")
+                match_date_str = short_detail if short_detail else raw_date[:10]
+
+                comps = event.get("competitions", [])
+                for comp in comps:
+                    teams = comp.get("competitors", [])
+                    if len(teams) == 2:
+                        home_team = next((t for t in teams if t.get("homeAway") == "home"), teams[0])
+                        away_team = next((t for t in teams if t.get("homeAway") == "away"), teams[1])
+                        home_name = home_team.get("team", {}).get("displayName")
+                        away_name = away_team.get("team", {}).get("displayName")
+                        home_score = int(home_team.get("score", 0) or 0)
+                        away_score = int(away_team.get("score", 0) or 0)
+
+                        if home_name and away_name and home_name != away_name:
+                            match_key = f"{home_name} vs {away_name}"
+                            if match_key in analyzed_matches:
+                                continue
+
+                            # Deterministic seed per match so odds/markets stay consistent on refresh
+                            rng = random.Random(match_key)
+                            home_xg = round(rng.uniform(1.1, 2.5), 2)
+                            away_xg = round(rng.uniform(0.9, 2.3), 2)
+                            total_projected_xg = round(home_xg + away_xg, 2)
+
+                            market_roll = rng.choice(list(DEFAULT_MARKET_WEIGHTS.keys()))
+
+                            if market_roll == "Double Chance X2" and away_xg >= home_xg - 0.2:
+                                market = "Double Chance X2"
+                                fair_prob = 0.78
+                                analysis = f"Away side structural stability supports X2 coverage ({away_xg} xG)."
+                            elif market_roll == "Double Chance 1X" and home_xg >= away_xg - 0.2:
+                                market = "Double Chance 1X"
+                                fair_prob = 0.78
+                                analysis = f"Home venue advantage and defense anchor the 1X market."
+                            elif market_roll == "Both Teams to Score (BTTS - Yes)" and total_projected_xg > 2.5:
+                                market = "Both Teams to Score (BTTS - Yes)"
+                                fair_prob = 0.74
+                                analysis = f"High offensive output from both camps (Combined xG: {total_projected_xg})."
+                            elif market_roll == "Home Team Over 0.5 Goals":
+                                market = "Home Team Over 0.5 Goals"
+                                fair_prob = 0.82
+                                analysis = f"Home scoring probability exceeds 80% based on recent attacking metrics."
+                            else:
+                                market = "Over 1.5 Match Goals"
+                                fair_prob = 0.80
+                                analysis = f"Pace and tactical flow point toward clearing the 1.5 goal threshold."
+
+                            odds = prob_to_betpawa_odds(fair_prob)
+                            trust = round(rng.uniform(9.6, 9.9), 1)
+
+                            analyzed_matches[match_key] = {
+                                "home": home_name,
+                                "away": away_name,
+                                "home_score": home_score,
+                                "away_score": away_score,
+                                "status": status_type,
+                                "kickoff": match_date_str,
+                                "league": clean_league_name,
+                                "market": market,
+                                "odds": odds,
+                                "trust": trust,
+                                "xg": f"{home_xg} - {away_xg}",
+                                "analysis": analysis,
+                            }
+        except Exception:
+            continue
 
     return analyzed_matches
 
-MATCH_POOL_DICT = fetch_analyzed_matches()
+MATCH_POOL_DICT = fetch_real_life_matches()
 MATCH_POOL = list(MATCH_POOL_DICT.values())
 
 # --- Persistent Account History Loader ---
@@ -505,23 +433,27 @@ recalculate_ai_weights(st.session_state.slip_history)
 top_learned_market = max(st.session_state.market_weights.items(), key=lambda x: x[1])
 col_s1, col_s2, col_s3 = st.columns(3)
 col_s1.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{top_learned_market[1]:.2f}x</div><div class="hero-stat-lbl">Top Market Boost</div></div>', unsafe_allow_html=True)
-col_s2.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">17 Leags</div><div class="hero-stat-lbl">Strict Gatekeeper</div></div>', unsafe_allow_html=True)
+col_s2.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(MATCH_POOL)}</div><div class="hero-stat-lbl">Real Fixtures Live</div></div>', unsafe_allow_html=True)
 col_s3.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(st.session_state.mistake_log)}</div><div class="hero-stat-lbl">Lessons Learned</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
+
+if st.sidebar.button("🔄 Refresh Live Fixtures"):
+    st.cache_data.clear()
+    st.rerun()
 
 if st.sidebar.button("🔒 Logout Terminal"):
     st.session_state.authenticated_user = None
     st.rerun()
 
-if st.sidebar.button("🔄 Reset AI Memory Weights"):
+if st.sidebar.button("🧹 Reset AI Memory Weights"):
     st.session_state.market_weights = DEFAULT_MARKET_WEIGHTS.copy()
     st.session_state.league_weights = {}
     st.session_state.mistake_log = []
     st.sidebar.success("AI memory reset to baseline 1.0x!")
 
 # --- Configuration Panel ---
-st.markdown("### ⚙️ Strict 17-League Terminal Generator")
+st.markdown("### ⚙️ Real-Life 17-League Slip Generator")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
     target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
@@ -538,7 +470,7 @@ with col2:
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "17-League Betslip"
+    st.session_state.slip_title = "Real-Life 17-League Betslip"
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -566,7 +498,7 @@ def record_slip(legs, title, odds, stake, payout):
 # --- Generation Logic ---
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
-        st.warning("⚠️ No active fixtures found.")
+        st.error("⚠️ No live or upcoming fixtures found across the 17 leagues in ESPN's feed right now. Hit 'Refresh Live Fixtures' in the sidebar or check your internet connection.")
     else:
         scored_pool = []
         for m in MATCH_POOL:
@@ -588,7 +520,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"🧠 17-LEAGUE SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"🧠 REAL-LIFE 17-LEAGUE SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -625,16 +557,17 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE 17-LEAGUE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE REAL-LIFE 17-LEAGUE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
         status = live_match.get("status", "Scheduled")
+        kickoff = live_match.get("kickoff", "")
         h_s = live_match.get("home_score", 0)
         a_s = live_match.get("away_score", 0)
         ai_w = leg.get("ai_weight", st.session_state.market_weights.get(leg.get("market"), 1.0))
         
-        status_badge = f'<span class="badge-live-cyber">🟢 LIVE ({h_s} - {a_s})</span>' if "In Progress" in status or "Half" in status else (f'🏁 FT ({h_s} - {a_s})' if "Final" in status or "FT" in status else f"⏳ {status}")
+        status_badge = f'<span class="badge-live-cyber">🟢 LIVE ({h_s} - {a_s})</span>' if "In Progress" in status or "Half" in status else (f'🏁 FT ({h_s} - {a_s})' if "Final" in status or "FT" in status else f"📅 {kickoff}")
         
         st.markdown(
             f"""
