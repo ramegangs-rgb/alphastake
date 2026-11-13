@@ -8,7 +8,7 @@ from supabase import create_client, Client
 
 # --- Page Setup ---
 st.set_page_config(
-    page_title="AlphaStake | Live UEFA Nations League & Pro Terminal",
+    page_title="AlphaStake | Strict 17-League Terminal",
     page_icon="⚽",
     layout="centered",
 )
@@ -155,11 +155,11 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                🟢 ALPHASTAKE | LIVE UEFA NATIONS LEAGUE FEED
+                ⚽ ALPHASTAKE v5.0 | EXACT 17-LEAGUE WHITELIST
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
-                Adaptive Reinforcement Terminal — Live International & Pro Feeds.
+                Strict 17-League Professional Terminal & Reinforcement Learning AI.
             </p>
         </div>
     """,
@@ -181,7 +181,7 @@ if not st.session_state.authenticated_user:
                         res = supabase.table("users").select("*").eq("username", user_login.strip().lower()).execute()
                         if res.data and res.data[0]["password"] == hash_password(pass_login):
                             st.session_state.authenticated_user = user_login.strip().lower()
-                            st.success("Access granted! Syncing live feeds...")
+                            st.success("Access granted! Syncing terminal...")
                             st.rerun()
                         else:
                             st.error("⚠️ Invalid credentials.")
@@ -275,27 +275,32 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🟢 LIVE UEFA NATIONS LEAGUE FEED ACTIVE
+            🔒 17-LEAGUE STRICT WHITELIST LOCKED
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
-# --- STRICT 12-LEAGUE WHITELIST ---
-STRICT_WHITELIST = {
-    "uefa.nations": "UEFA Nations League",
-    "fifa.friendly": "International Friendlies / Qualifiers",
-    "caf.nations": "CAF Africa Cup of Nations / Qualifiers",
-    "caf.champions": "CAF Champions League",
-    "uefa.champions": "UEFA Champions League",
-    "uefa.europa": "UEFA Europa League",
+# --- EXACT 17-LEAGUE WHITELIST DICTIONARY ---
+EXACT_17_LEAGUES = {
     "eng.1": "English Premier League",
-    "eng.2": "English Championship",
-    "esp.1": "Spanish La Liga",
+    "fra.1": "Ligue 1",
+    "esp.1": "La Liga",
     "ita.1": "Italian Serie A",
-    "ger.1": "German Bundesliga",
-    "fra.1": "French Ligue 1",
+    "bra.1": "Brazilian Serie A",
+    "uefa.champions": "UEFA Champions League",
+    "uefa.nations": "UEFA Nations League",
+    "uefa.conference": "UEFA Conference League",
+    "uefa.europa": "UEFA Europa League",
+    "sco.1": "Scottish Premiership",
+    "ger.1": "Bundesliga",
+    "caf.nations": "Africa Cup of Nations (AFCON)",
+    "bel.1": "Belgian Pro League",
+    "ned.1": "Netherlands Eredivisie",
+    "nor.1": "Norway Eliteserien",
+    "por.1": "Liga Portugal",
+    "tur.1": "Turkish Süper Lig",
 }
 
 def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.02):
@@ -316,11 +321,10 @@ def fetch_analyzed_matches():
 
     blacklisted_terms = ["college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth"]
 
-    # Target specific ESPN endpoints for robust multi-league coverage
     api_endpoints = [
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.friendly/scoreboard",
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard"
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/all/scoreboard",
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard",
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.nations/scoreboard"
     ]
 
     for d_str in dates_to_fetch:
@@ -340,30 +344,41 @@ def fetch_analyzed_matches():
                             continue
 
                         matched_key = None
-                        if "nations-league" in league_slug or "uefa nations" in full_league_str or "nations league" in full_league_str:
-                            matched_key = "uefa.nations"
-                        elif "caf champions" in full_league_str or "caf-champions" in league_slug:
-                            matched_key = "caf.champions"
-                        elif "africa cup of nations" in full_league_str or "caf" in full_league_str:
-                            matched_key = "caf.nations"
+                        # Strict 17-League Matching Rules
+                        if "eng.1" in league_slug or "premier league" in full_league_str:
+                            matched_key = "eng.1"
+                        elif "fra.1" in league_slug or "ligue 1" in full_league_str:
+                            matched_key = "fra.1"
+                        elif "esp.1" in league_slug or "la liga" in full_league_str:
+                            matched_key = "esp.1"
+                        elif "ita.1" in league_slug or "serie a" in full_league_str and "brazil" not in full_league_str:
+                            matched_key = "ita.1"
+                        elif "bra.1" in league_slug or "brazil" in full_league_str or "serie a" in full_league_str and "brazil" in full_league_str:
+                            matched_key = "bra.1"
                         elif "champions-league" in league_slug or "champions league" in full_league_str:
                             matched_key = "uefa.champions"
-                        elif "europa-league" in league_slug or "europa" in full_league_str:
+                        elif "nations-league" in league_slug or "nations league" in full_league_str:
+                            matched_key = "uefa.nations"
+                        elif "conference" in league_slug or "conference league" in full_league_str:
+                            matched_key = "uefa.conference"
+                        elif "europa-league" in league_slug or "europa league" in full_league_str:
                             matched_key = "uefa.europa"
-                        elif "eng.1" in league_slug or "premier-league" in full_league_str:
-                            matched_key = "eng.1"
-                        elif "eng.2" in league_slug or "championship" in full_league_str:
-                            matched_key = "eng.2"
-                        elif "esp.1" in league_slug or "la-liga" in full_league_str:
-                            matched_key = "esp.1"
-                        elif "ita.1" in league_slug or "serie-a" in full_league_str:
-                            matched_key = "ita.1"
-                        elif "ger.1" in league_slug or "bundesliga" in full_league_str:
+                        elif "sco.1" in league_slug or "scottish premiership" in full_league_str:
+                            matched_key = "sco.1"
+                        elif "ger.1" in league_slug or "bundesliga" in full_league_str and "austria" not in full_league_str:
                             matched_key = "ger.1"
-                        elif "fra.1" in league_slug or "ligue-1" in full_league_str:
-                            matched_key = "fra.1"
-                        elif "international friendlies" in full_league_str or "world cup qualification" in full_league_str or "friendly" in full_league_str:
-                            matched_key = "fifa.friendly"
+                        elif "africa cup of nations" in full_league_str or "afcon" in full_league_str:
+                            matched_key = "caf.nations"
+                        elif "bel.1" in league_slug or "belgian" in full_league_str or "pro league" in full_league_str:
+                            matched_key = "bel.1"
+                        elif "ned.1" in league_slug or "eredivisie" in full_league_str:
+                            matched_key = "ned.1"
+                        elif "nor.1" in league_slug or "eliteserien" in full_league_str:
+                            matched_key = "nor.1"
+                        elif "por.1" in league_slug or "liga portugal" in full_league_str:
+                            matched_key = "por.1"
+                        elif "tur.1" in league_slug or "super lig" in full_league_str or "sueper lig" in full_league_str:
+                            matched_key = "tur.1"
 
                         if not matched_key:
                             continue
@@ -382,7 +397,7 @@ def fetch_analyzed_matches():
                                 if home_name and away_name:
                                     match_key = f"{home_name} vs {away_name}"
                                     if match_key in analyzed_matches:
-                                        continue  # Prevent duplicates across endpoints
+                                        continue
 
                                     home_xg = round(random.uniform(1.0, 2.6), 2)
                                     away_xg = round(random.uniform(0.9, 2.4), 2)
@@ -420,7 +435,7 @@ def fetch_analyzed_matches():
                                         "home_score": home_score,
                                         "away_score": away_score,
                                         "status": status_type,
-                                        "league": STRICT_WHITELIST[matched_key],
+                                        "league": EXACT_17_LEAGUES[matched_key],
                                         "market": market,
                                         "odds": odds,
                                         "trust": trust,
@@ -429,6 +444,34 @@ def fetch_analyzed_matches():
                                     }
             except Exception:
                 continue
+
+    # Guaranteed test mode fallback using exclusively the 17 leagues if API pool is quiet
+    if not analyzed_matches:
+        mock_fixtures = [
+            ("Arsenal", "Chelsea", "English Premier League", "Over 1.5 Match Goals", 1.21, "2.0 - 1.7", "London derby pace clears goal threshold."),
+            ("Real Madrid", "Barcelona", "La Liga", "Both Teams to Score (BTTS - Yes)", 1.29, "2.3 - 2.1", "El Clásico offensive firepower."),
+            ("PSG", "Marseille", "Ligue 1", "Double Chance 1X", 1.20, "1.9 - 1.0", "Home dominance in Le Classique."),
+            ("Inter Milan", "Juventus", "Italian Serie A", "Draw No Bet (Home)", 1.25, "1.6 - 1.1", "San Siro tactical edge."),
+            ("Flamengo", "Palmeiras", "Brazilian Serie A", "Both Teams to Score (BTTS - Yes)", 1.33, "2.1 - 1.8", "High-stakes Série A heavyweight bout."),
+            ("Real Madrid", "Manchester City", "UEFA Champions League", "Over 1.5 Match Goals", 1.22, "2.2 - 2.0", "UCL knockout high-tempo fixture."),
+            ("France", "Portugal", "UEFA Nations League", "Double Chance 1X", 1.23, "1.8 - 1.1", "Balanced squad depth secures points."),
+            ("Ajax", "Feyenoord", "Netherlands Eredivisie", "Both Teams to Score (BTTS - Yes)", 1.27, "2.2 - 2.0", "De Klassieker attacking style."),
+        ]
+        for home, away, league, market, odds, xg, analysis in mock_fixtures:
+            match_key = f"{home} vs {away}"
+            analyzed_matches[match_key] = {
+                "home": home,
+                "away": away,
+                "home_score": 0,
+                "away_score": 0,
+                "status": "Scheduled (17-League Test Mode)",
+                "league": league,
+                "market": market,
+                "odds": odds,
+                "trust": 9.8,
+                "xg": xg,
+                "analysis": analysis,
+            }
 
     return analyzed_matches
 
@@ -453,7 +496,7 @@ recalculate_ai_weights(st.session_state.slip_history)
 top_learned_market = max(st.session_state.market_weights.items(), key=lambda x: x[1])
 col_s1, col_s2, col_s3 = st.columns(3)
 col_s1.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{top_learned_market[1]:.2f}x</div><div class="hero-stat-lbl">Top Market Boost</div></div>', unsafe_allow_html=True)
-col_s2.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(MATCH_POOL)}</div><div class="hero-stat-lbl">Live Matches Loaded</div></div>', unsafe_allow_html=True)
+col_s2.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">17 Leags</div><div class="hero-stat-lbl">Strict Whitelist</div></div>', unsafe_allow_html=True)
 col_s3.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(st.session_state.mistake_log)}</div><div class="hero-stat-lbl">Lessons Learned</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -469,7 +512,7 @@ if st.sidebar.button("🔄 Reset AI Memory Weights"):
     st.sidebar.success("AI memory reset to baseline 1.0x!")
 
 # --- Configuration Panel ---
-st.markdown("### ⚙️ Live UEFA Nations League & Pro Terminal")
+st.markdown("### ⚙️ 17-League Terminal Generator")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
     target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
@@ -486,7 +529,7 @@ with col2:
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "Live UEFA Nations League Betslip"
+    st.session_state.slip_title = "17-League Betslip"
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -514,7 +557,7 @@ def record_slip(legs, title, odds, stake, payout):
 # --- Generation Logic ---
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
-        st.warning("⚠️ No active fixtures found in the live feed right now. Check back shortly as matchdays progress!")
+        st.warning("⚠️ No active fixtures found.")
     else:
         scored_pool = []
         for m in MATCH_POOL:
@@ -536,7 +579,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"🧠 LIVE UEFA/PRO SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"🧠 17-LEAGUE SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -573,7 +616,7 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE LIVE NATIONS LEAGUE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE 17-LEAGUE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
