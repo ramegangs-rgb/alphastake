@@ -155,11 +155,11 @@ if not st.session_state.authenticated_user:
         """
         <div style="text-align: center; margin-top: 50px; margin-bottom: 30px;">
             <div style="display: inline-block; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 16px; border-radius: 30px; color: #10B981; font-size: 12px; font-weight: 700; margin-bottom: 12px;">
-                🧠 ALPHASTAKE v4.0 | SELF-LEARNING AI ENGINE
+                🧠 ALPHASTAKE v4.1 | STRICT 12-LEAGUE VALIDATOR
             </div>
             <h1 class="brand-title-cyber">ALPHASTAKE</h1>
             <p style="color: #9CA3AF; font-size: 15px; max-width: 420px; margin: 8px auto 0 auto;">
-                Adaptive Reinforcement Terminal — Learns From Every Win & Loss.
+                Adaptive Reinforcement Terminal — Strict Whitelist Enforcement.
             </p>
         </div>
     """,
@@ -236,12 +236,11 @@ if "mistake_log" not in st.session_state:
     st.session_state.mistake_log = []
 
 def recalculate_ai_weights(history):
-    """Rebuilds confidence weights automatically from all settled Won/Lost tickets."""
     m_weights = DEFAULT_MARKET_WEIGHTS.copy()
     l_weights = {}
     lessons = []
 
-    for ticket in reversed(history):  # Process chronologically from oldest to newest
+    for ticket in reversed(history):
         status = ticket.get("status", "Pending")
         if status not in ["Won", "Lost"]:
             continue
@@ -276,15 +275,15 @@ st.markdown(
             <span style="font-size: 13px; color: #9CA3AF;">Active Operator: <b style="color: #10B981;">@{st.session_state.authenticated_user}</b></span>
         </div>
         <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); padding: 6px 14px; border-radius: 10px; font-size: 12px; font-weight: 700; color: #10B981;">
-            🧠 ADAPTIVE LEARNING ON
+            🔒 STRICT 12-LEAGUE LOCK
         </div>
     </div>
 """,
     unsafe_allow_html=True,
 )
 
-# --- COMBINED WHITELIST DICTIONARY (Original 10 Pro Leagues + International Break) ---
-COMBINED_WHITELIST = {
+# --- STRICT 12-LEAGUE WHITELIST (EXACT MATCHING) ---
+STRICT_WHITELIST = {
     "uefa.nations": "UEFA Nations League",
     "fifa.friendly": "International Friendlies / Qualifiers",
     "caf.nations": "CAF Africa Cup of Nations / Qualifiers",
@@ -312,7 +311,7 @@ def fetch_analyzed_matches():
     tomorrow = today + timedelta(days=1)
     dates_to_fetch = [today.strftime("%Y%m%d"), tomorrow.strftime("%Y%m%d")]
 
-    blacklisted_terms = ["college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve"]
+    blacklisted_terms = ["college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth", "friendly"]
 
     for d_str in dates_to_fetch:
         try:
@@ -323,38 +322,42 @@ def fetch_analyzed_matches():
                 for event in events:
                     league_obj = event.get("season", {})
                     league_slug = league_obj.get("slug", "").lower()
-                    league_name = league_obj.get("name", "").lower()
+                    league_name = event.get("league", {}).get("name", "").lower()
                     full_league_str = f"{league_slug} {league_name}"
 
+                    # Hard discard non-pro / blacklisted terms
                     if any(term in full_league_str for term in blacklisted_terms):
                         continue
 
                     matched_key = None
-                    if "uefa.nations" in league_slug or "nations-league" in league_slug or "nations" in full_league_str:
+                    # STRICT IDENTIFICATION CHECK
+                    if "nations-league" in league_slug or "uefa nations" in full_league_str:
                         matched_key = "uefa.nations"
-                    elif "caf" in full_league_str or "africa" in full_league_str:
-                        matched_key = "caf.nations" if "nations" in full_league_str else "caf.champions"
-                    elif "friendly" in full_league_str or "fifa" in full_league_str or "world cup qualification" in full_league_str:
-                        matched_key = "fifa.friendly"
-                    elif "uefa.champions" in league_slug or "champions-league" in league_slug:
+                    elif "caf champions" in full_league_str or "caf-champions" in league_slug:
+                        matched_key = "caf.champions"
+                    elif "africa cup of nations" in full_league_str or "caf" in full_league_str:
+                        matched_key = "caf.nations"
+                    elif "champions-league" in league_slug and "uefa" in full_league_str:
                         matched_key = "uefa.champions"
-                    elif "uefa.europa" in league_slug or "europa-league" in league_slug:
+                    elif "europa-league" in league_slug or "europa" in full_league_str:
                         matched_key = "uefa.europa"
-                    elif "eng.1" in league_slug or "premier-league" in league_slug:
+                    elif "eng.1" in league_slug or "premier-league" in full_league_str:
                         matched_key = "eng.1"
-                    elif "eng.2" in league_slug or "championship" in league_slug:
+                    elif "eng.2" in league_slug or "championship" in full_league_str:
                         matched_key = "eng.2"
-                    elif "esp.1" in league_slug or "la-liga" in league_slug:
+                    elif "esp.1" in league_slug or "la-liga" in full_league_str:
                         matched_key = "esp.1"
-                    elif "ita.1" in league_slug or "serie-a" in league_slug:
+                    elif "ita.1" in league_slug or "serie-a" in full_league_str:
                         matched_key = "ita.1"
-                    elif "ger.1" in league_slug or "bundesliga" in league_slug:
+                    elif "ger.1" in league_slug or "bundesliga" in full_league_str:
                         matched_key = "ger.1"
-                    elif "fra.1" in league_slug or "ligue-1" in league_slug:
+                    elif "fra.1" in league_slug or "ligue-1" in full_league_str:
                         matched_key = "fra.1"
+                    elif "international friendlies" in full_league_str or "world cup qualification" in full_league_str:
+                        matched_key = "fifa.friendly"
 
                     if not matched_key:
-                        continue
+                        continue  # Discard anything not matching our strict 12 keys
 
                     status_type = event.get("status", {}).get("type", {}).get("description", "Scheduled")
                     comps = event.get("competitions", [])
@@ -405,7 +408,7 @@ def fetch_analyzed_matches():
                                     "home_score": home_score,
                                     "away_score": away_score,
                                     "status": status_type,
-                                    "league": COMBINED_WHITELIST[matched_key],
+                                    "league": STRICT_WHITELIST[matched_key],
                                     "market": market,
                                     "odds": odds,
                                     "trust": trust,
@@ -421,8 +424,6 @@ def fetch_analyzed_matches():
             ("Nigeria", "Ghana", "CAF Africa Cup of Nations / Qualifiers", "Both Teams to Score (BTTS - Yes)", 1.32, "2.2 - 1.9", "Rivalry clash with strong attacking metrics."),
             ("Al Ahly", "Mamelodi Sundowns", "CAF Champions League", "Over 1.5 Match Goals", 1.25, "2.1 - 1.4", "High offensive pressure in continental fixture."),
             ("England", "Spain", "UEFA Nations League", "Both Teams to Score (BTTS - Yes)", 1.30, "2.4 - 2.2", "Elite attacking talent on both sides."),
-            ("Brazil", "Argentina", "International Friendlies / Qualifiers", "Double Chance X2", 1.28, "1.6 - 1.8", "South American heavyweight tactical parity."),
-            ("Wydad AC", "TP Mazembe", "CAF Champions League", "Home Team Over 0.5 Goals", 1.18, "1.9 - 0.8", "Strong home scoring conversion rate."),
             ("Arsenal", "Chelsea", "English Premier League", "Over 1.5 Match Goals", 1.21, "2.0 - 1.7", "London derby pace clears goal threshold."),
             ("Real Madrid", "Barcelona", "Spanish La Liga", "Both Teams to Score (BTTS - Yes)", 1.29, "2.3 - 2.1", "El Clásico offensive firepower."),
         ]
@@ -459,14 +460,13 @@ if supabase and st.session_state.authenticated_user and not st.session_state.sli
     except Exception:
         pass
 
-# Sync AI weights with existing history
 recalculate_ai_weights(st.session_state.slip_history)
 
 # --- Hero Stats ---
 top_learned_market = max(st.session_state.market_weights.items(), key=lambda x: x[1])
 col_s1, col_s2, col_s3 = st.columns(3)
 col_s1.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{top_learned_market[1]:.2f}x</div><div class="hero-stat-lbl">Top Market Boost</div></div>', unsafe_allow_html=True)
-col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">12 Leags</div><div class="hero-stat-lbl">Pro + International</div></div>', unsafe_allow_html=True)
+col_s2.markdown('<div class="hero-stat-card"><div class="hero-stat-val">12 Leags</div><div class="hero-stat-lbl">Strict Enforcement</div></div>', unsafe_allow_html=True)
 col_s3.markdown(f'<div class="hero-stat-card"><div class="hero-stat-val">{len(st.session_state.mistake_log)}</div><div class="hero-stat-lbl">Lessons Learned</div></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -482,7 +482,7 @@ if st.sidebar.button("🔄 Reset AI Memory Weights"):
     st.sidebar.success("AI memory reset to baseline 1.0x!")
 
 # --- Configuration Panel ---
-st.markdown("### ⚙️ Adaptive Terminal Generator")
+st.markdown("### ⚙️ Strict 12-League Terminal Generator")
 col_cfg1, col_cfg2 = st.columns(2)
 with col_cfg1:
     target_odds = st.number_input("Target Total Odds (Max 5.0):", min_value=1.10, max_value=5.00, value=3.50, step=0.25)
@@ -499,7 +499,7 @@ with col2:
 if "generated_slip" not in st.session_state:
     st.session_state.generated_slip = []
 if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "Adaptive AI Betslip"
+    st.session_state.slip_title = "Strict 12-League Betslip"
 
 def record_slip(legs, title, odds, stake, payout):
     timestamp = datetime.now().strftime("%H:%M:%S")
@@ -524,7 +524,7 @@ def record_slip(legs, title, odds, stake, payout):
         except Exception:
             pass
 
-# --- Adaptive Weighted Generation Logic ---
+# --- Generation Logic ---
 if generate_clicked or sure_clicked:
     if not MATCH_POOL:
         st.warning("⚠️ No active fixtures found.")
@@ -533,18 +533,13 @@ if generate_clicked or sure_clicked:
         for m in MATCH_POOL:
             m_weight = st.session_state.market_weights.get(m["market"], 1.0)
             l_weight = st.session_state.league_weights.get(m["league"], 1.0)
-            intl_bonus = 1.15 if ("Nations" in m["league"] or "CAF" in m["league"] or "International" in m["league"]) else 1.0
-            
-            # Score combines base trust with learned market & league weights
-            ai_score = m["trust"] * m_weight * l_weight * intl_bonus * random.uniform(0.95, 1.05)
+            ai_score = m["trust"] * m_weight * l_weight * random.uniform(0.95, 1.05)
             scored_pool.append((ai_score, m_weight, m))
 
-        # Sort highest learned confidence first!
         scored_pool.sort(key=lambda x: x[0], reverse=True)
 
         selected_legs, current_prod = [], 1.0
         for ai_score, m_weight, match in scored_pool:
-            # Skip heavily penalized markets (< 0.45x) unless pool is exhausted
             if m_weight < 0.45 and len(scored_pool) > 4:
                 continue
             if current_prod < target_odds and len(selected_legs) < 10:
@@ -554,7 +549,7 @@ if generate_clicked or sure_clicked:
                 current_prod *= match["odds"]
 
         st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = f"🧠 ADAPTIVE AI SLIP ({target_odds}x Target)"
+        st.session_state.slip_title = f"🧠 STRICT 12-LEAGUE SLIP ({target_odds}x Target)"
         
         total_odds_prod = 1.0
         for l in selected_legs:
@@ -591,7 +586,7 @@ if st.session_state.generated_slip:
         unsafe_allow_html=True,
     )
 
-    slip_text = f"⚡ *ALPHASTAKE ADAPTIVE AI SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
+    slip_text = f"⚡ *ALPHASTAKE STRICT 12-LEAGUE SLIP* ⚡\nTarget: {target_odds}x | Actual: {round(total_odds, 2)}x\nStake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
     for i, leg in enumerate(st.session_state.generated_slip, 1):
         match_key = f"{leg.get('home')} vs {leg.get('away')}"
         live_match = MATCH_POOL_DICT.get(match_key, leg)
@@ -626,23 +621,6 @@ if st.session_state.generated_slip:
     st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background: linear-gradient(135deg, #25D366 0%, #128C7E 100%); color: white; padding: 14px 20px; border-radius: 12px; text-align: center; font-weight: 800; font-size: 16px; margin-bottom: 15px; box-shadow: 0 4px 20px rgba(37, 211, 102, 0.3);">💬 Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
     st.text_area("📋 Copy Booking Text", slip_text, height=120)
 
-# --- Neural Self-Learning Diagnostics ---
-st.markdown("---")
-st.subheader("🧠 AI Self-Learning Memory & Market Confidence")
-st.caption("Mark tickets as Won or Lost below — AlphaStake automatically boosts winning markets and penalizes losing ones.")
-
-w_cols = st.columns(2)
-sorted_weights = sorted(st.session_state.market_weights.items(), key=lambda x: x[1], reverse=True)
-for idx, (mkt_name, weight_val) in enumerate(sorted_weights):
-    with w_cols[idx % 2]:
-        color = "#10B981" if weight_val > 1.0 else ("#EF4444" if weight_val < 1.0 else "#9CA3AF")
-        st.markdown(f"**{mkt_name}:** <span style='color:{color}; font-weight:800;'>{weight_val:.2f}x</span>", unsafe_allow_html=True)
-
-if st.session_state.mistake_log:
-    with st.expander("📉 Recent Mistakes Analyzed & Penalized"):
-        for lesson in st.session_state.mistake_log:
-            st.markdown(lesson)
-
 # --- Profit & Loss Dashboard ---
 st.markdown("---")
 st.subheader("📊 Session P&L Performance Tracker")
@@ -662,7 +640,7 @@ col_p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len([t for t in settled_tickets
 
 # --- Interactive History Log with Settlement Buttons ---
 st.markdown("<br>", unsafe_allow_html=True)
-st.subheader(f"📜 Terminal History & Feedback Training (@{st.session_state.authenticated_user})")
+st.subheader(f"📜 Terminal History (@{st.session_state.authenticated_user})")
 
 if st.session_state.slip_history:
     if st.button("🗑️ Clear History Log"):
@@ -679,7 +657,6 @@ if st.session_state.slip_history:
         with st.expander(f"Ticket #{past_slip['id']} | {past_slip['title']} ({past_slip['odds']}x) — [{badge_icon} {status_label}]"):
             st.markdown(f"**Stake:** {past_slip['stake']:,} UGX | **Est Payout:** **{past_slip['payout']:,.0f} UGX**")
             
-            # Settlement Buttons to Train the AI
             btn_col1, btn_col2, btn_col3 = st.columns(3)
             with btn_col1:
                 if st.button("✅ Mark Won (+Boost)", key=f"won_{idx}"):
