@@ -28,7 +28,18 @@ if SUPABASE_URL and SUPABASE_KEY:
 def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
-# --- Ultra-Aesthetic Professional Terminal CSS ---
+# --- Initialize Default Neural Weights ---
+DEFAULT_MARKET_WEIGHTS = {
+    "Double Chance X2": 1.0,
+    "Double Chance 1X": 1.0,
+    "Over 1.5 Match Goals": 1.0,
+    "Both Teams to Score (BTTS - Yes)": 1.0,
+    "Draw No Bet (Home)": 1.0,
+    "Draw No Bet (Away)": 1.0,
+    "Home Team Over 0.5 Goals": 1.0,
+}
+
+# --- Professional Terminal CSS ---
 st.markdown(
     """
     <style>
@@ -158,6 +169,9 @@ if not st.session_state.authenticated_user:
                         res = supabase.table("users").select("*").eq("username", user_login.strip().lower()).execute()
                         if res.data and res.data[0]["password"] == hash_password(pass_login):
                             st.session_state.authenticated_user = user_login.strip().lower()
+                            db_weights = res.data[0].get("weights")
+                            if db_weights and isinstance(db_weights, dict):
+                                st.session_state.market_weights = db_weights
                             st.rerun()
                         else:
                             st.error("Invalid credentials.")
@@ -183,7 +197,8 @@ if not st.session_state.authenticated_user:
                         else:
                             supabase.table("users").insert({
                                 "username": user_new.strip().lower(),
-                                "password": hash_password(pass_new)
+                                "password": hash_password(pass_new),
+                                "weights": DEFAULT_MARKET_WEIGHTS.copy()
                             }).execute()
                             st.success("Account created. Please sign in.")
                     else:
@@ -191,17 +206,7 @@ if not st.session_state.authenticated_user:
                         st.rerun()
     st.stop()
 
-# --- Initialize Self-Learning Weights ---
-DEFAULT_MARKET_WEIGHTS = {
-    "Double Chance X2": 1.0,
-    "Double Chance 1X": 1.0,
-    "Over 1.5 Match Goals": 1.0,
-    "Both Teams to Score (BTTS - Yes)": 1.0,
-    "Draw No Bet (Home)": 1.0,
-    "Draw No Bet (Away)": 1.0,
-    "Home Team Over 0.5 Goals": 1.0,
-}
-
+# --- Session State Initialization ---
 if "market_weights" not in st.session_state:
     st.session_state.market_weights = DEFAULT_MARKET_WEIGHTS.copy()
 
@@ -210,6 +215,27 @@ if "league_weights" not in st.session_state:
 
 if "mistake_log" not in st.session_state:
     st.session_state.mistake_log = []
+
+def save_weights_to_supabase():
+    if supabase and st.session_state.authenticated_user:
+        try:
+            supabase.table("users").update({
+                "weights": st.session_state.market_weights
+            }).eq("username", st.session_state.authenticated_user).execute()
+        except Exception:
+            pass
+
+def sync_tickets_to_supabase():
+    if supabase and st.session_state.authenticated_user:
+        try:
+            supabase.table("user_tickets").delete().eq("username", st.session_state.authenticated_user).execute()
+            for t in reversed(st.session_state.slip_history):
+                supabase.table("user_tickets").insert({
+                    "username": st.session_state.authenticated_user,
+                    "ticket_data": t
+                }).execute()
+        except Exception:
+            pass
 
 def recalculate_ai_weights(history):
     m_weights = DEFAULT_MARKET_WEIGHTS.copy()
@@ -241,8 +267,10 @@ def recalculate_ai_weights(history):
     st.session_state.market_weights = m_weights
     st.session_state.league_weights = l_weights
     st.session_state.mistake_log = list(reversed(lessons))[:6]
+    save_weights_to_supabase()
 
 # --- Post-Login Header ---
+db_badge = "SUPABASE SYNCED" if supabase else "LOCAL SESSION"
 st.markdown(
     f"""
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -251,7 +279,7 @@ st.markdown(
             <span style="font-size: 12px; color: #64748B;">Operator Session Active</span>
         </div>
         <div style="background: #111522; border: 1px solid #1E293B; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; color: #10B981;">
-            SECURE GATEWAY
+            {db_badge}
         </div>
     </div>
 """,
@@ -302,11 +330,11 @@ def _fetch_single_endpoint(slug, clean_league_name, date_str):
     return clean_league_name, []
 
 @st.cache_data(ttl=120)
-def fetch_real_life_matches():
+def fetch_real_life_matches(days_ahead=2):
     analyzed_matches = {}
     league_counts = {name: 0 for name in EXACT_17_LEAGUES.values()}
     today = datetime.now()
-    dates_to_fetch = [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(0, 5)]
+    dates_to_fetch = [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(0, days_ahead)]
 
     blacklisted_terms = ["usl", "mls", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth"]
 
@@ -398,7 +426,15 @@ def fetch_real_life_matches():
 
     return analyzed_matches, league_counts
 
-MATCH_POOL_DICT, LEAGUE_COUNTS = fetch_real_life_matches()
+# --- Sidebar Window & Controls ---
+window_choice = st.sidebar.selectbox(
+    "Fixture Window",
+    options=["Today & Tomorrow (48h)", "Today Only (24h)", "3-Day Schedule"],
+    index=0
+)
+days_map = {"Today Only (24h)": 1, "Today & Tomorrow (48h)": 2, "3-Day Schedule": 3}
+
+MATCH_POOL_DICT, LEAGUE_COUNTS = fetch_real_life_matches(days_ahead=days_map[window_choice])
 MATCH_POOL = list(MATCH_POOL_DICT.values())
 
 # --- Persistent Account History Loader ---
@@ -413,7 +449,8 @@ if supabase and st.session_state.authenticated_user and not st.session_state.sli
     except Exception:
         pass
 
-recalculate_ai_weights(st.session_state.slip_history)
+if st.session_state.slip_history:
+    recalculate_ai_weights(st.session_state.slip_history)
 
 # --- Hero Stats ---
 top_learned_market = max(st.session_state.market_weights.items(), key=lambda x: x[1])
@@ -424,19 +461,20 @@ col_s3.markdown(f'<div class="terminal-stat-card"><div class="terminal-stat-val"
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- Sidebar Controls ---
 if st.sidebar.button("Refresh Feed Cache"):
     st.cache_data.clear()
     st.rerun()
 
 if st.sidebar.button("Lock Terminal Session"):
     st.session_state.authenticated_user = None
+    st.session_state.slip_history = []
     st.rerun()
 
 if st.sidebar.button("Reset Neural Weights"):
     st.session_state.market_weights = DEFAULT_MARKET_WEIGHTS.copy()
     st.session_state.league_weights = {}
     st.session_state.mistake_log = []
+    save_weights_to_supabase()
     st.sidebar.success("Weights reset to baseline.")
 
 with st.sidebar.expander("League Feed Status (17 Leagues)", expanded=False):
@@ -487,7 +525,7 @@ def record_slip(legs, title, odds, stake, payout):
 
 if st.button("Generate Smart Terminal Slip"):
     if not MATCH_POOL:
-        st.error("No active fixtures found across the 17 whitelisted leagues in the current window.")
+        st.error("No active fixtures found across the 17 whitelisted leagues in the selected window.")
     else:
         scored_pool = []
         for m in MATCH_POOL:
@@ -623,16 +661,19 @@ if st.session_state.slip_history:
                 if st.button("Mark Won", key=f"won_{idx}"):
                     st.session_state.slip_history[idx]["status"] = "Won"
                     recalculate_ai_weights(st.session_state.slip_history)
+                    sync_tickets_to_supabase()
                     st.rerun()
             with btn_col2:
                 if st.button("Mark Lost", key=f"lost_{idx}"):
                     st.session_state.slip_history[idx]["status"] = "Lost"
                     recalculate_ai_weights(st.session_state.slip_history)
+                    sync_tickets_to_supabase()
                     st.rerun()
             with btn_col3:
                 if st.button("Reset Pending", key=f"pend_{idx}"):
                     st.session_state.slip_history[idx]["status"] = "Pending"
                     recalculate_ai_weights(st.session_state.slip_history)
+                    sync_tickets_to_supabase()
                     st.rerun()
 
             st.markdown("---")
