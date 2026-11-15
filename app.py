@@ -286,13 +286,12 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# --- 17-LEAGUE WHITELIST & ENDPOINTS ---
-EXACT_17_LEAGUES = {
+# --- STRICT 16-LEAGUE WHITELIST & ENDPOINTS (BRAZILIAN SERIE A REMOVED) ---
+EXACT_16_LEAGUES = {
     "eng.1": "English Premier League",
     "fra.1": "Ligue 1",
     "esp.1": "La Liga",
     "ita.1": "Italian Serie A",
-    "bra.1": "Brazilian Serie A",
     "uefa.champions": "UEFA Champions League",
     "uefa.nations": "UEFA Nations League",
     "uefa.europa.conf": "UEFA Conference League",
@@ -332,15 +331,15 @@ def _fetch_single_endpoint(slug, clean_league_name, date_str):
 @st.cache_data(ttl=120)
 def fetch_real_life_matches(days_ahead=2):
     analyzed_matches = {}
-    league_counts = {name: 0 for name in EXACT_17_LEAGUES.values()}
+    league_counts = {name: 0 for name in EXACT_16_LEAGUES.values()}
     today = datetime.now()
     dates_to_fetch = [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(0, days_ahead)]
 
-    blacklisted_terms = ["usl", "mls", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth"]
+    blacklisted_terms = ["usl", "mls", "brazil", "bra.1", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth"]
 
     tasks = []
     with ThreadPoolExecutor(max_workers=15) as executor:
-        for slug, clean_league_name in EXACT_17_LEAGUES.items():
+        for slug, clean_league_name in EXACT_16_LEAGUES.items():
             for d_str in dates_to_fetch:
                 tasks.append(executor.submit(_fetch_single_endpoint, slug, clean_league_name, d_str))
 
@@ -477,7 +476,7 @@ if st.sidebar.button("Reset Neural Weights"):
     save_weights_to_supabase()
     st.sidebar.success("Weights reset to baseline.")
 
-with st.sidebar.expander("League Feed Status (17 Leagues)", expanded=False):
+with st.sidebar.expander("League Feed Status (16 Leagues)", expanded=False):
     active_leagues = {k: v for k, v in LEAGUE_COUNTS.items() if v > 0}
     if active_leagues:
         for lg_name, count in sorted(active_leagues.items(), key=lambda x: x[1], reverse=True):
@@ -525,7 +524,7 @@ def record_slip(legs, title, odds, stake, payout):
 
 if st.button("Generate Smart Terminal Slip"):
     if not MATCH_POOL:
-        st.error("No active fixtures found across the 17 whitelisted leagues in the selected window.")
+        st.error("No active fixtures found across the 16 whitelisted leagues in the selected window.")
     else:
         scored_pool = []
         for m in MATCH_POOL:
