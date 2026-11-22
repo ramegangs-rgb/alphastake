@@ -1,6 +1,5 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
-import math
 import random
 from typing import Any
 
@@ -9,7 +8,7 @@ import streamlit as st
 from supabase import Client, create_client
 
 # ==============================================================================
-# CONFIGURATION & EXCLUSIVE 17 LEAGUES
+# PAGE CONFIG & EXCLUSIVE 17 LEAGUES
 # ==============================================================================
 st.set_page_config(
     page_title="AlphaStake | Professional Trading Terminal",
@@ -37,42 +36,92 @@ LEAGUE_CONFIG: list[dict[str, Any]] = [
     {"name": "Turkish Süper Lig", "slug": "tur.1", "weight": 1.02},
 ]
 
-FINISHED_STATUSES = {
+FINISHED_TOKENS = (
     "ft",
     "full time",
     "full-time",
     "final",
     "post",
-    "status_final",
-    "status_full_time",
     "completed",
     "finished",
     "aet",
     "pen",
-    "status_end_period",
-}
-
-LIVE_STATUSES = {
-    "in",
-    "live",
-    "ht",
-    "half time",
-    "half-time",
-    "status_in_progress",
-    "status_halftime",
-}
+    "end_period",
+)
 
 MARKET_TEMPLATES: list[dict[str, Any]] = [
-    {"market": "Over 1.5 Match Goals", "base_odds": 1.24, "prob": 0.78},
-    {"market": "Home Team Over 0.5 Goals", "base_odds": 1.21, "prob": 0.80},
-    {"market": "Double Chance 1X", "base_odds": 1.27, "prob": 0.76},
-    {"market": "Both Teams to Score (BTTS - Yes)", "base_odds": 1.34, "prob": 0.71},
-    {"market": "Over 2.5 Match Goals", "base_odds": 1.62, "prob": 0.58},
+    {"market": "Over 1.5 Match Goals", "base_odds": 1.24},
+    {"market": "Home Team Over 0.5 Goals", "base_odds": 1.21},
+    {"market": "Double Chance 1X", "base_odds": 1.27},
+    {"market": "Both Teams to Score (BTTS - Yes)", "base_odds": 1.34},
+    {"market": "Over 2.5 Match Goals", "base_odds": 1.62},
 ]
 
 
 # ==============================================================================
-# STYLES (CLEAN MINIMALIST TERMINAL)
+# SAFE LEG & STATUS HELPERS (PREVENTS KEYERROR & BLOCKS FT MATCHES)
+# ==============================================================================
+def get_leg_match(leg: Any) -> str:
+    if isinstance(leg, str):
+        return leg
+    if not isinstance(leg, dict):
+        return "Match"
+    home = leg.get("home") or leg.get("home_team")
+    away = leg.get("away") or leg.get("away_team")
+    fallback = f"{home} vs {away}" if home and away else "Match"
+    return str(
+        leg.get("matchup")
+        or leg.get("match")
+        or leg.get("fixture")
+        or leg.get("event")
+        or leg.get("name")
+        or fallback
+    )
+
+
+def get_leg_league(leg: Any) -> str:
+    if not isinstance(leg, dict):
+        return "League"
+    return str(leg.get("league") or leg.get("competition") or "League")
+
+
+def get_leg_kickoff(leg: Any) -> str:
+    if not isinstance(leg, dict):
+        return "Upcoming"
+    return str(leg.get("kickoff") or leg.get("time") or leg.get("date") or "Upcoming")
+
+
+def get_leg_market(leg: Any) -> str:
+    if not isinstance(leg, dict):
+        return "Market"
+    return str(leg.get("market") or leg.get("pick") or leg.get("selection") or "Market")
+
+
+def get_leg_odds(leg: Any) -> float:
+    if not isinstance(leg, dict):
+        return 1.0
+    try:
+        return float(leg.get("odds", 1.0))
+    except (TypeError, ValueError):
+        return 1.0
+
+
+def is_upcoming_fixture(item: Any) -> bool:
+    if not isinstance(item, dict):
+        return True
+    if item.get("is_completed") or item.get("is_finished") or item.get("completed"):
+        return False
+    status_str = " ".join(
+        str(item.get(k) or "")
+        for k in ("status", "status_detail", "match_status", "state")
+    ).strip().lower()
+    if not status_str:
+        return True
+    return not any(tok in status_str for tok in FINISHED_TOKENS)
+
+
+# ==============================================================================
+# STYLES (CLEAN DARK TERMINAL)
 # ==============================================================================
 st.markdown(
     """
@@ -165,7 +214,7 @@ def load_user_tickets(sb: Client | None, username: str) -> list[dict[str, Any]]:
         sb.table("user_tickets")
         .select("*")
         .eq("username", username)
-        .order("id", desc=True)
+        .order("id", desc=False)
         .execute()
     )
     rows = res.data or []
@@ -175,9 +224,9 @@ def load_user_tickets(sb: Client | None, username: str) -> list[dict[str, Any]]:
         if isinstance(data, dict):
             item = dict(data)
             item.setdefault("db_id", row.get("id"))
-            item.setdefault("ticket_no", len(rows) - idx + 1)
+            item.setdefault("ticket_no", idx)
             normalized.append(item)
-    return list(reversed(normalized))
+    return normalized
 
 
 def save_ticket_to_db(sb: Client | None, username: str, ticket: dict[str, Any]) -> None:
@@ -226,38 +275,13 @@ def update_weights_in_db(sb: Client | None, username: str, weights: dict[str, An
 
 
 # ==============================================================================
-# FIXTURE FETCHING & STRICT UPCOMING FILTER (NO FT MATCHES)
+# ESPN FIXTURE FEED (UPCOMING MATCHES ONLY — ZERO FT MATCHES)
 # ==============================================================================
-def is_finished_status(status_text: str, completed_flag: bool) -> bool:
-    if completed_flag:
-        return True
-    norm = (status_text or "").strip().lower()
-    if not norm:
-        return False
-    if norm in FINISHED_STATUSES:
-        return True
-    return any(token in norm for token in ("ft", "full time", "full-time", "final", "post"))
-
-
-def is_upcoming_fixture(fixture: dict[str, Any]) -> bool:
-    if fixture.get("is_completed") or fixture.get("is_finished"):
-        return False
-    status_label = str(fixture.get("status") or "").strip().lower()
-    status_code = str(fixture.get("status_detail") or "").strip().lower()
-    combined = f"{status_label} {status_code}"
-    if is_finished_status(status_label, False) or is_finished_status(status_code, False):
-        return False
-    if any(tok in combined for tok in ("ft", "full time", "full-time", "final", "post")):
-        return False
-    return True
-
-
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_espn_fixtures(window_days: int, cache_bust: int) -> tuple[list[dict[str, Any]], dict[str, int]]:
     _ = cache_bust
     now_utc = datetime.now(timezone.utc)
     cutoff_utc = now_utc + timedelta(days=window_days)
-    # Query today and upcoming days in YYYYMMDD format
     dates_to_query = [
         (now_utc + timedelta(days=offset)).strftime("%Y%m%d")
         for offset in range(0, max(window_days, 1) + 1)
@@ -298,8 +322,16 @@ def fetch_espn_fixtures(window_days: int, cache_bust: int) -> tuple[list[dict[st
                 home_comp = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
                 away_comp = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
 
-                home_team = home_comp.get("team", {}).get("shortDisplayName") or home_comp.get("team", {}).get("displayName") or "Home"
-                away_team = away_comp.get("team", {}).get("shortDisplayName") or away_comp.get("team", {}).get("displayName") or "Away"
+                home_team = (
+                    home_comp.get("team", {}).get("shortDisplayName")
+                    or home_comp.get("team", {}).get("displayName")
+                    or "Home"
+                )
+                away_team = (
+                    away_comp.get("team", {}).get("shortDisplayName")
+                    or away_comp.get("team", {}).get("displayName")
+                    or "Away"
+                )
 
                 status_obj = comp.get("status") or event.get("status") or {}
                 status_type = status_obj.get("type") or {}
@@ -307,10 +339,6 @@ def fetch_espn_fixtures(window_days: int, cache_bust: int) -> tuple[list[dict[st
                 state_str = str(status_type.get("state") or "")
                 name_str = str(status_type.get("name") or "")
                 short_detail = str(status_type.get("shortDetail") or status_type.get("detail") or "")
-                status_combined = " ".join(x for x in (state_str, name_str, short_detail) if x).strip()
-
-                if is_finished_status(status_combined, completed):
-                    continue
 
                 kickoff_str = comp.get("date") or event.get("date") or ""
                 kickoff_dt: datetime | None = None
@@ -320,9 +348,9 @@ def fetch_espn_fixtures(window_days: int, cache_bust: int) -> tuple[list[dict[st
                     except ValueError:
                         kickoff_dt = None
 
-                # Keep matches that have not finished yet and fall inside the selected window
+                # Block any match that already started or falls outside the selected window
                 if kickoff_dt is not None:
-                    if kickoff_dt < (now_utc - timedelta(hours=3)):
+                    if kickoff_dt <= now_utc:
                         continue
                     if kickoff_dt > cutoff_utc:
                         continue
@@ -352,7 +380,7 @@ def fetch_espn_fixtures(window_days: int, cache_bust: int) -> tuple[list[dict[st
 
 
 # ==============================================================================
-# SLIP GENERATOR (STRICTLY UPCOMING FIXTURES ONLY)
+# SMART SLIP BUILDER (STRICTLY UPCOMING MATCHES)
 # ==============================================================================
 def build_smart_slip(
     fixtures: list[dict[str, Any]],
@@ -377,20 +405,25 @@ def build_smart_slip(
         if running_odds >= target_odds and len(selected_legs) >= 2:
             break
 
-        # Pick a market whose adjusted odds help reach target_odds cleanly
         candidates = sorted(
             MARKET_TEMPLATES,
-            key=lambda m: abs((running_odds * round(m["base_odds"] * fix.get("weight", 1.0) * market_multiplier, 2)) - target_odds),
+            key=lambda m: abs(
+                (running_odds * round(m["base_odds"] * float(fix.get("weight", 1.0)) * market_multiplier, 2))
+                - target_odds
+            ),
         )
         chosen_mkt = candidates[0] if running_odds * 1.4 < target_odds else rng.choice(MARKET_TEMPLATES[:4])
-        leg_odds = round(max(1.15, chosen_mkt["base_odds"] * fix.get("weight", 1.0) * market_multiplier), 2)
+        leg_odds = round(
+            max(1.15, chosen_mkt["base_odds"] * float(fix.get("weight", 1.0)) * market_multiplier),
+            2,
+        )
 
         selected_legs.append(
             {
-                "matchup": fix["matchup"],
-                "league": fix["league"],
-                "kickoff": fix["kickoff"],
-                "status": fix["status"],
+                "matchup": get_leg_match(fix),
+                "league": get_leg_league(fix),
+                "kickoff": get_leg_kickoff(fix),
+                "status": str(fix.get("status", "Scheduled")),
                 "market": chosen_mkt["market"],
                 "odds": leg_odds,
             }
@@ -439,6 +472,7 @@ def render_auth_screen(sb: Client | None) -> None:
                 st.session_state.username = username
                 st.session_state.weights = user_row.get("weights") or {"market_multiplier": 1.00, "penalties": 0}
                 st.session_state.tickets = load_user_tickets(sb, username)
+                st.session_state.current_slip = []
                 st.rerun()
             else:
                 st.session_state.authenticated = True
@@ -479,6 +513,7 @@ def render_auth_screen(sb: Client | None) -> None:
                 st.session_state.username = new_user
                 st.session_state.weights = default_weights
                 st.session_state.tickets = []
+                st.session_state.current_slip = []
                 st.success("Account created. Entering terminal...")
                 st.rerun()
             else:
@@ -568,7 +603,7 @@ def render_terminal(sb: Client | None) -> None:
             market_multiplier=multiplier,
         )
         if not legs:
-            st.warning("No upcoming (unplayed) fixtures found in the selected window. Try 7-Day Schedule or click Refresh Feed Cache.")
+            st.warning("No upcoming (unplayed) fixtures found in this window. Try 7-Day Schedule or click Refresh Feed Cache.")
         else:
             st.session_state.current_slip = legs
             next_num = len(st.session_state.tickets) + 1
@@ -588,28 +623,31 @@ def render_terminal(sb: Client | None) -> None:
             st.rerun()
 
     # --------------------------------------------------------------------------
-    # ACCUMULATOR SLIP (UPCOMING MATCHES ONLY)
+    # ACCUMULATOR SLIP (SAFE .GET() LOOKUPS & UPCOMING MATCHES ONLY)
     # --------------------------------------------------------------------------
     st.header("Accumulator Slip")
-    active_slip = st.session_state.get("current_slip") or (
-        st.session_state.tickets[-1].get("legs", []) if st.session_state.tickets else []
-    )
+    active_slip = st.session_state.get("current_slip") or []
     upcoming_slip_legs = [leg for leg in active_slip if is_upcoming_fixture(leg)]
 
     if upcoming_slip_legs:
         slip_odds = 1.0
         for idx, leg in enumerate(upcoming_slip_legs, start=1):
-            slip_odds = round(slip_odds * float(leg["odds"]), 2)
+            leg_match = get_leg_match(leg)
+            leg_league = get_leg_league(leg)
+            leg_kickoff = get_leg_kickoff(leg)
+            leg_market = get_leg_market(leg)
+            leg_odds = get_leg_odds(leg)
+            slip_odds = round(slip_odds * leg_odds, 2)
             st.markdown(
-                f'<div class="leg-row"><strong>{idx}. {leg["matchup"]}</strong> '
-                f'({leg["league"]} · {leg["kickoff"]}) → '
-                f'{leg["market"]} <strong>@ {float(leg["odds"]):.2f}</strong></div>',
+                f'<div class="leg-row"><strong>{idx}. {leg_match}</strong> '
+                f"({leg_league} · {leg_kickoff}) → "
+                f"{leg_market} <strong>@ {leg_odds:.2f}</strong></div>",
                 unsafe_allow_html=True,
             )
         est_return = int(round(stake_amount * slip_odds))
-        st.caption(f"Combined Odds: **{slip_odds:.2f}x** · Est. Payout: **{est_return:,} UGX** (Upcoming fixtures only)")
+        st.caption(f"Combined Odds: **{slip_odds:.2f}x** · Est. Payout: **{est_return:,} UGX** (Upcoming matches only)")
     else:
-        st.caption("No active slip generated yet. Click **Generate Smart Terminal Slip** above.")
+        st.caption("Click **Generate Smart Terminal Slip** above to build a fresh upcoming-only slip.")
 
     # --------------------------------------------------------------------------
     # SESSION P&L ANALYTICS
@@ -636,7 +674,7 @@ def render_terminal(sb: Client | None) -> None:
         st.markdown(
             f'<div class="kpi-box"><div class="kpi-label">Net P&L</div>'
             f'<div class="kpi-value">{net_pnl:+,} UGX</div>'
-            f'<div>{roi_pct:+.1f}% ROI</div></div>',
+            f"<div>{roi_pct:+.1f}% ROI</div></div>",
             unsafe_allow_html=True,
         )
     with k2:
@@ -649,7 +687,7 @@ def render_terminal(sb: Client | None) -> None:
         st.markdown(
             f'<div class="kpi-box"><div class="kpi-label">Win Rate</div>'
             f'<div class="kpi-value">{win_rate:.1f}%</div>'
-            f'<div>{len(won_tickets)}/{len(settled)} Settled</div></div>',
+            f"<div>{len(won_tickets)}/{len(settled)} Settled</div></div>",
             unsafe_allow_html=True,
         )
 
@@ -700,8 +738,8 @@ def render_terminal(sb: Client | None) -> None:
 
             for l_idx, leg in enumerate(t_legs, start=1):
                 st.markdown(
-                    f"&nbsp;&nbsp;{l_idx}. {leg.get('matchup', 'Match')} → "
-                    f"{leg.get('market', 'Market')} @ {float(leg.get('odds', 1.0)):.2f}"
+                    f"&nbsp;&nbsp;{l_idx}. {get_leg_match(leg)} → "
+                    f"{get_leg_market(leg)} @ {get_leg_odds(leg):.2f}"
                 )
 
 
