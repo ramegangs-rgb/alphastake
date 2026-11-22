@@ -1,682 +1,721 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import hashlib
+import math
 import random
+from typing import Any
+
 import requests
 import streamlit as st
-import urllib.parse
-from supabase import create_client, Client
+from supabase import Client, create_client
 
-# --- Page Setup ---
+# ==============================================================================
+# CONFIGURATION & EXCLUSIVE 17 LEAGUES
+# ==============================================================================
 st.set_page_config(
     page_title="AlphaStake | Professional Trading Terminal",
-    page_icon="⚡",
-    layout="centered",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
-# --- Supabase Database Initialization ---
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
-SUPABASE_KEY = st.secrets.get("SUPABASE_KEY", "")
+LEAGUE_CONFIG: list[dict[str, Any]] = [
+    {"name": "English Premier League", "slug": "eng.1", "weight": 1.08},
+    {"name": "Ligue 1", "slug": "fra.1", "weight": 1.02},
+    {"name": "La Liga", "slug": "esp.1", "weight": 1.05},
+    {"name": "Italian Serie A", "slug": "ita.1", "weight": 1.04},
+    {"name": "Brazilian Serie A", "slug": "bra.1", "weight": 1.00},
+    {"name": "UEFA Champions League", "slug": "uefa.champions", "weight": 1.06},
+    {"name": "UEFA Nations League", "slug": "uefa.nations", "weight": 0.96},
+    {"name": "UEFA Conference League", "slug": "uefa.europa.conf", "weight": 0.97},
+    {"name": "UEFA Europa League", "slug": "uefa.europa", "weight": 1.02},
+    {"name": "Scottish Premiership", "slug": "sco.1", "weight": 0.99},
+    {"name": "Bundesliga", "slug": "ger.1", "weight": 1.07},
+    {"name": "Africa Cup of Nations", "slug": "caf.nations", "weight": 0.95},
+    {"name": "Belgian Pro League", "slug": "bel.1", "weight": 1.01},
+    {"name": "Netherlands Eredivisie", "slug": "ned.1", "weight": 1.05},
+    {"name": "Norwegian Eliteserien", "slug": "nor.1", "weight": 1.02},
+    {"name": "Liga Portugal", "slug": "por.1", "weight": 1.03},
+    {"name": "Turkish Süper Lig", "slug": "tur.1", "weight": 1.02},
+]
 
-supabase: Client = None
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception:
-        pass
-
-def hash_password(password):
-    return hashlib.sha256(str.encode(password)).hexdigest()
-
-# --- Initialize Default Neural Weights ---
-DEFAULT_MARKET_WEIGHTS = {
-    "Double Chance X2": 1.0,
-    "Double Chance 1X": 1.0,
-    "Over 1.5 Match Goals": 1.0,
-    "Both Teams to Score (BTTS - Yes)": 1.0,
-    "Draw No Bet (Home)": 1.0,
-    "Draw No Bet (Away)": 1.0,
-    "Home Team Over 0.5 Goals": 1.0,
+FINISHED_STATUSES = {
+    "ft",
+    "full time",
+    "full-time",
+    "final",
+    "post",
+    "status_final",
+    "status_full_time",
+    "completed",
+    "finished",
+    "aet",
+    "pen",
+    "status_end_period",
 }
 
-# --- Professional Terminal CSS ---
+LIVE_STATUSES = {
+    "in",
+    "live",
+    "ht",
+    "half time",
+    "half-time",
+    "status_in_progress",
+    "status_halftime",
+}
+
+MARKET_TEMPLATES: list[dict[str, Any]] = [
+    {"market": "Over 1.5 Match Goals", "base_odds": 1.24, "prob": 0.78},
+    {"market": "Home Team Over 0.5 Goals", "base_odds": 1.21, "prob": 0.80},
+    {"market": "Double Chance 1X", "base_odds": 1.27, "prob": 0.76},
+    {"market": "Both Teams to Score (BTTS - Yes)", "base_odds": 1.34, "prob": 0.71},
+    {"market": "Over 2.5 Match Goals", "base_odds": 1.62, "prob": 0.58},
+]
+
+
+# ==============================================================================
+# STYLES (CLEAN MINIMALIST TERMINAL)
+# ==============================================================================
 st.markdown(
     """
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
-    }
-
-    .stApp {
-        background: #090B10;
-        color: #E2E8F0;
-    }
-
-    .brand-title-terminal {
-        font-size: 32px;
-        font-weight: 800;
-        color: #F8FAFC;
-        margin: 0;
-        letter-spacing: -0.5px;
-    }
-
-    .terminal-stat-card {
-        background: #111522;
-        border: 1px solid #1E293B;
-        border-radius: 12px;
-        padding: 14px;
-        text-align: center;
-    }
-    .terminal-stat-val {
-        font-size: 20px;
-        font-weight: 700;
-        color: #10B981;
-    }
-    .terminal-stat-lbl {
-        font-size: 10px;
-        color: #64748B;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        margin-top: 4px;
-    }
-
-    .glass-card {
-        background: #111522;
-        border: 1px solid #1E293B;
-        border-radius: 12px;
-        padding: 18px;
-        margin-bottom: 14px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-    }
-
-    .badge-market {
-        background: #064E3B;
-        color: #34D399;
-        padding: 3px 10px;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.5px;
-    }
-    
-    .badge-status {
-        background: #1E293B;
-        color: #94A3B8;
-        padding: 3px 8px;
-        border-radius: 6px;
-        font-size: 11px;
-        font-weight: 600;
-    }
-
-    .analysis-text {
-        font-size: 13px;
-        color: #94A3B8;
-        margin-top: 8px;
-        padding-left: 10px;
-        border-left: 2px solid #3B82F6;
-    }
-
-    .stButton>button {
-        background: #10B981 !important;
-        color: #050505 !important;
-        border: none !important;
-        font-weight: 700 !important;
-        font-size: 14px !important;
-        border-radius: 10px !important;
-        height: 44px !important;
-        width: 100% !important;
-        transition: all 0.2s ease !important;
-    }
-    .stButton>button:hover {
-        background: #059669 !important;
-    }
+        .block-container { padding-top: 1.5rem; padding-bottom: 2.5rem; }
+        .badge-pill {
+            display: inline-block;
+            padding: 0.22rem 0.65rem;
+            border-radius: 999px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            letter-spacing: 0.04em;
+            background: rgba(16, 185, 129, 0.14);
+            color: #10b981;
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            margin-right: 0.5rem;
+        }
+        .badge-local {
+            background: rgba(245, 158, 11, 0.14);
+            color: #f59e0b;
+            border-color: rgba(245, 158, 11, 0.35);
+        }
+        .kpi-box {
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            background: rgba(15, 23, 42, 0.35);
+        }
+        .kpi-label { font-size: 0.78rem; opacity: 0.75; margin-bottom: 0.2rem; }
+        .kpi-value { font-size: 1.35rem; font-weight: 700; }
+        .leg-row {
+            padding: 0.45rem 0.7rem;
+            border-left: 3px solid #10b981;
+            background: rgba(148, 163, 184, 0.06);
+            margin-bottom: 0.4rem;
+            border-radius: 0 6px 6px 0;
+            font-size: 0.92rem;
+        }
     </style>
-""",
-    unsafe_allow_html=True,
-)
-
-# --- Authentication State ---
-if "authenticated_user" not in st.session_state:
-    st.session_state.authenticated_user = None
-
-if not st.session_state.authenticated_user:
-    st.markdown(
-        """
-        <div style="text-align: center; margin-top: 60px; margin-bottom: 30px;">
-            <h1 class="brand-title-terminal">ALPHASTAKE</h1>
-            <p style="color: #64748B; font-size: 14px; margin-top: 6px;">
-                Secure Institutional Sports Analytics & Terminal
-            </p>
-        </div>
     """,
-        unsafe_allow_html=True,
-    )
-
-    tab_login, tab_signup = st.tabs(["Sign In", "Register"])
-
-    with tab_login:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            with st.form("login_form"):
-                user_login = st.text_input("Username", placeholder="reagan")
-                pass_login = st.text_input("Password", type="password", placeholder="••••••••")
-                submit_login = st.form_submit_button("Access Terminal")
-
-                if submit_login:
-                    if supabase:
-                        res = supabase.table("users").select("*").eq("username", user_login.strip().lower()).execute()
-                        if res.data and res.data[0]["password"] == hash_password(pass_login):
-                            st.session_state.authenticated_user = user_login.strip().lower()
-                            db_weights = res.data[0].get("weights")
-                            if db_weights and isinstance(db_weights, dict):
-                                st.session_state.market_weights = db_weights
-                            st.rerun()
-                        else:
-                            st.error("Invalid credentials.")
-                    else:
-                        st.session_state.authenticated_user = user_login.strip().lower()
-                        st.rerun()
-
-    with tab_signup:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            with st.form("signup_form"):
-                user_new = st.text_input("Choose Username", placeholder="reagan")
-                pass_new = st.text_input("Choose Password", type="password", placeholder="••••••••")
-                submit_signup = st.form_submit_button("Create Account")
-
-                if submit_signup:
-                    if len(user_new.strip()) < 3 or len(pass_new) < 4:
-                        st.error("Username & password must be 3+ and 4+ characters.")
-                    elif supabase:
-                        res = supabase.table("users").select("*").eq("username", user_new.strip().lower()).execute()
-                        if res.data:
-                            st.error("Username already exists.")
-                        else:
-                            supabase.table("users").insert({
-                                "username": user_new.strip().lower(),
-                                "password": hash_password(pass_new),
-                                "weights": DEFAULT_MARKET_WEIGHTS.copy()
-                            }).execute()
-                            st.success("Account created. Please sign in.")
-                    else:
-                        st.session_state.authenticated_user = user_new.strip().lower()
-                        st.rerun()
-    st.stop()
-
-# --- Session State Initialization ---
-if "market_weights" not in st.session_state:
-    st.session_state.market_weights = DEFAULT_MARKET_WEIGHTS.copy()
-
-if "league_weights" not in st.session_state:
-    st.session_state.league_weights = {}
-
-if "mistake_log" not in st.session_state:
-    st.session_state.mistake_log = []
-
-def save_weights_to_supabase():
-    if supabase and st.session_state.authenticated_user:
-        try:
-            supabase.table("users").update({
-                "weights": st.session_state.market_weights
-            }).eq("username", st.session_state.authenticated_user).execute()
-        except Exception:
-            pass
-
-def sync_tickets_to_supabase():
-    if supabase and st.session_state.authenticated_user:
-        try:
-            supabase.table("user_tickets").delete().eq("username", st.session_state.authenticated_user).execute()
-            for t in reversed(st.session_state.slip_history):
-                supabase.table("user_tickets").insert({
-                    "username": st.session_state.authenticated_user,
-                    "ticket_data": t
-                }).execute()
-        except Exception:
-            pass
-
-def recalculate_ai_weights(history):
-    m_weights = DEFAULT_MARKET_WEIGHTS.copy()
-    l_weights = {}
-    lessons = []
-
-    for ticket in reversed(history):
-        status = ticket.get("status", "Pending")
-        if status not in ["Won", "Lost"]:
-            continue
-
-        for leg in ticket.get("legs", []):
-            mkt = leg.get("market", "")
-            lg = leg.get("league", "")
-
-            if mkt not in m_weights:
-                m_weights[mkt] = 1.0
-            if lg not in l_weights:
-                l_weights[lg] = 1.0
-
-            if status == "Won":
-                m_weights[mkt] = min(round(m_weights[mkt] + 0.15, 2), 2.0)
-                l_weights[lg] = min(round(l_weights[lg] + 0.10, 2), 1.8)
-            elif status == "Lost":
-                m_weights[mkt] = max(round(m_weights[mkt] - 0.22, 2), 0.20)
-                l_weights[lg] = max(round(l_weights[lg] - 0.15, 2), 0.30)
-                lessons.append(f"Penalized `{mkt}` in {lg} after Ticket #{ticket['id']} loss")
-
-    st.session_state.market_weights = m_weights
-    st.session_state.league_weights = l_weights
-    st.session_state.mistake_log = list(reversed(lessons))[:6]
-    save_weights_to_supabase()
-
-# --- Post-Login Header ---
-db_badge = "SUPABASE SYNCED" if supabase else "LOCAL SESSION"
-st.markdown(
-    f"""
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-        <div>
-            <h1 class="brand-title-terminal">ALPHASTAKE</h1>
-            <span style="font-size: 12px; color: #64748B;">Operator Session Active</span>
-        </div>
-        <div style="background: #111522; border: 1px solid #1E293B; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 600; color: #10B981;">
-            {db_badge}
-        </div>
-    </div>
-""",
     unsafe_allow_html=True,
 )
 
-# --- STRICT 16-LEAGUE WHITELIST & ENDPOINTS (BRAZILIAN SERIE A REMOVED) ---
-EXACT_16_LEAGUES = {
-    "eng.1": "English Premier League",
-    "fra.1": "Ligue 1",
-    "esp.1": "La Liga",
-    "ita.1": "Italian Serie A",
-    "uefa.champions": "UEFA Champions League",
-    "uefa.nations": "UEFA Nations League",
-    "uefa.europa.conf": "UEFA Conference League",
-    "uefa.europa": "UEFA Europa League",
-    "sco.1": "Scottish Premiership",
-    "ger.1": "Bundesliga",
-    "caf.nations": "Africa Cup of Nations (AFCON)",
-    "bel.1": "Belgian Pro League",
-    "ned.1": "Netherlands Eredivisie",
-    "nor.1": "Norway Eliteserien",
-    "por.1": "Liga Portugal",
-    "tur.1": "Turkish Süper Lig",
-}
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Accept": "application/json",
-}
-
-def prob_to_betpawa_odds(probability, margin=0.03, market_boost=1.02):
-    if probability <= 0:
-        return 99.00
-    adjusted_prob = probability * (1 + margin)
-    raw_odds = (1 / adjusted_prob) * market_boost
-    return max(min(round(raw_odds, 2), 1.55), 1.12)
-
-def _fetch_single_endpoint(slug, clean_league_name, date_str):
-    url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={date_str}"
+# ==============================================================================
+# SUPABASE & AUTH HELPERS
+# ==============================================================================
+@st.cache_resource
+def get_supabase_client() -> Client | None:
+    url = st.secrets.get("SUPABASE_URL", "")
+    key = st.secrets.get("SUPABASE_KEY", "") or st.secrets.get("SUPABASE_ANON_KEY", "")
+    if not url or not key:
+        return None
     try:
-        res = requests.get(url, headers=HEADERS, timeout=5)
-        if res.status_code == 200:
-            return clean_league_name, res.json().get("events", [])
+        return create_client(url, key)
     except Exception:
-        pass
-    return clean_league_name, []
+        return None
 
-@st.cache_data(ttl=120)
-def fetch_real_life_matches(days_ahead=2):
-    analyzed_matches = {}
-    league_counts = {name: 0 for name in EXACT_16_LEAGUES.values()}
-    today = datetime.now()
-    dates_to_fetch = [(today + timedelta(days=offset)).strftime("%Y%m%d") for offset in range(0, days_ahead)]
 
-    blacklisted_terms = ["usl", "mls", "brazil", "bra.1", "college", "ncaa", "women", "u21", "u19", "u20", "high-school", "amateur", "reserve", "youth"]
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
 
-    tasks = []
-    with ThreadPoolExecutor(max_workers=15) as executor:
-        for slug, clean_league_name in EXACT_16_LEAGUES.items():
-            for d_str in dates_to_fetch:
-                tasks.append(executor.submit(_fetch_single_endpoint, slug, clean_league_name, d_str))
 
-        for future in as_completed(tasks):
-            clean_league_name, events = future.result()
-            for event in events:
-                league_obj = event.get("season", {})
-                api_slug = league_obj.get("slug", "").lower()
-                api_name = event.get("league", {}).get("name", "").lower()
-                full_str = f"{api_slug} {api_name}"
+def init_session_state() -> None:
+    defaults: dict[str, Any] = {
+        "authenticated": False,
+        "username": "",
+        "weights": {"market_multiplier": 1.00, "penalties": 0},
+        "tickets": [],
+        "current_slip": [],
+        "fixture_cache_bust": 0,
+    }
+    for key, val in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = val
 
-                if any(term in full_str for term in blacklisted_terms):
+
+def fetch_user_record(sb: Client | None, username: str) -> dict[str, Any] | None:
+    if not sb:
+        return None
+    res = sb.table("users").select("*").eq("username", username).limit(1).execute()
+    rows = res.data or []
+    return rows[0] if rows else None
+
+
+def load_user_tickets(sb: Client | None, username: str) -> list[dict[str, Any]]:
+    if not sb:
+        return st.session_state.get("tickets", [])
+    res = (
+        sb.table("user_tickets")
+        .select("*")
+        .eq("username", username)
+        .order("id", desc=True)
+        .execute()
+    )
+    rows = res.data or []
+    normalized: list[dict[str, Any]] = []
+    for idx, row in enumerate(rows, start=1):
+        data = row.get("ticket_data") or {}
+        if isinstance(data, dict):
+            item = dict(data)
+            item.setdefault("db_id", row.get("id"))
+            item.setdefault("ticket_no", len(rows) - idx + 1)
+            normalized.append(item)
+    return list(reversed(normalized))
+
+
+def save_ticket_to_db(sb: Client | None, username: str, ticket: dict[str, Any]) -> None:
+    if not sb:
+        st.session_state.tickets.append(ticket)
+        return
+    inserted = (
+        sb.table("user_tickets")
+        .insert({"username": username, "ticket_data": ticket})
+        .execute()
+    )
+    if inserted.data and isinstance(inserted.data, list):
+        ticket["db_id"] = inserted.data[0].get("id")
+
+
+def update_ticket_status_in_db(
+    sb: Client | None, username: str, ticket: dict[str, Any], new_status: str
+) -> None:
+    ticket["status"] = new_status
+    if not sb:
+        return
+    db_id = ticket.get("db_id")
+    if db_id is not None:
+        sb.table("user_tickets").update({"ticket_data": ticket}).eq("id", db_id).execute()
+    else:
+        rows = (
+            sb.table("user_tickets")
+            .select("id, ticket_data")
+            .eq("username", username)
+            .execute()
+            .data
+            or []
+        )
+        for r in rows:
+            td = r.get("ticket_data") or {}
+            if td.get("created_at") == ticket.get("created_at") and td.get("odds") == ticket.get("odds"):
+                sb.table("user_tickets").update({"ticket_data": ticket}).eq("id", r["id"]).execute()
+                break
+
+
+def update_weights_in_db(sb: Client | None, username: str, weights: dict[str, Any]) -> None:
+    st.session_state.weights = weights
+    if not sb:
+        return
+    sb.table("users").update({"weights": weights}).eq("username", username).execute()
+
+
+# ==============================================================================
+# FIXTURE FETCHING & STRICT UPCOMING FILTER (NO FT MATCHES)
+# ==============================================================================
+def is_finished_status(status_text: str, completed_flag: bool) -> bool:
+    if completed_flag:
+        return True
+    norm = (status_text or "").strip().lower()
+    if not norm:
+        return False
+    if norm in FINISHED_STATUSES:
+        return True
+    return any(token in norm for token in ("ft", "full time", "full-time", "final", "post"))
+
+
+def is_upcoming_fixture(fixture: dict[str, Any]) -> bool:
+    if fixture.get("is_completed") or fixture.get("is_finished"):
+        return False
+    status_label = str(fixture.get("status") or "").strip().lower()
+    status_code = str(fixture.get("status_detail") or "").strip().lower()
+    combined = f"{status_label} {status_code}"
+    if is_finished_status(status_label, False) or is_finished_status(status_code, False):
+        return False
+    if any(tok in combined for tok in ("ft", "full time", "full-time", "final", "post")):
+        return False
+    return True
+
+
+@st.cache_data(ttl=600, show_spinner=False)
+def fetch_espn_fixtures(window_days: int, cache_bust: int) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    _ = cache_bust
+    now_utc = datetime.now(timezone.utc)
+    cutoff_utc = now_utc + timedelta(days=window_days)
+    # Query today and upcoming days in YYYYMMDD format
+    dates_to_query = [
+        (now_utc + timedelta(days=offset)).strftime("%Y%m%d")
+        for offset in range(0, max(window_days, 1) + 1)
+    ]
+
+    all_upcoming: list[dict[str, Any]] = []
+    league_counts: dict[str, int] = {cfg["name"]: 0 for cfg in LEAGUE_CONFIG}
+    seen_ids: set[str] = set()
+
+    for cfg in LEAGUE_CONFIG:
+        league_name = cfg["name"]
+        slug = cfg["slug"]
+        weight = cfg["weight"]
+
+        for d_str in dates_to_query:
+            url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={d_str}"
+            try:
+                resp = requests.get(url, timeout=6)
+                if resp.status_code != 200:
+                    continue
+                payload = resp.json()
+            except Exception:
+                continue
+
+            for event in payload.get("events", []):
+                ev_id = str(event.get("id", ""))
+                if not ev_id or ev_id in seen_ids:
                     continue
 
-                status_obj = event.get("status", {}).get("type", {})
-                status_type = status_obj.get("description", "Scheduled")
-                short_detail = status_obj.get("shortDetail", "")
-                raw_date = event.get("date", "")
-                match_date_str = short_detail if short_detail else raw_date[:10]
+                competitions = event.get("competitions", [])
+                if not competitions:
+                    continue
+                comp = competitions[0]
+                competitors = comp.get("competitors", [])
+                if len(competitors) < 2:
+                    continue
 
-                comps = event.get("competitions", [])
-                for comp in comps:
-                    teams = comp.get("competitors", [])
-                    if len(teams) == 2:
-                        home_team = next((t for t in teams if t.get("homeAway") == "home"), teams[0])
-                        away_team = next((t for t in teams if t.get("homeAway") == "away"), teams[1])
-                        home_name = home_team.get("team", {}).get("displayName")
-                        away_name = away_team.get("team", {}).get("displayName")
-                        home_score = int(home_team.get("score", 0) or 0)
-                        away_score = int(away_team.get("score", 0) or 0)
+                home_comp = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
+                away_comp = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
 
-                        if home_name and away_name and home_name != away_name:
-                            match_key = f"{home_name} vs {away_name}"
-                            if match_key in analyzed_matches:
-                                continue
+                home_team = home_comp.get("team", {}).get("shortDisplayName") or home_comp.get("team", {}).get("displayName") or "Home"
+                away_team = away_comp.get("team", {}).get("shortDisplayName") or away_comp.get("team", {}).get("displayName") or "Away"
 
-                            rng = random.Random(match_key)
-                            home_xg = round(rng.uniform(1.1, 2.5), 2)
-                            away_xg = round(rng.uniform(0.9, 2.3), 2)
-                            total_projected_xg = round(home_xg + away_xg, 2)
+                status_obj = comp.get("status") or event.get("status") or {}
+                status_type = status_obj.get("type") or {}
+                completed = bool(status_type.get("completed", False))
+                state_str = str(status_type.get("state") or "")
+                name_str = str(status_type.get("name") or "")
+                short_detail = str(status_type.get("shortDetail") or status_type.get("detail") or "")
+                status_combined = " ".join(x for x in (state_str, name_str, short_detail) if x).strip()
 
-                            market_roll = rng.choice(list(DEFAULT_MARKET_WEIGHTS.keys()))
+                if is_finished_status(status_combined, completed):
+                    continue
 
-                            if market_roll == "Double Chance X2" and away_xg >= home_xg - 0.2:
-                                market = "Double Chance X2"
-                                fair_prob = 0.78
-                                analysis = f"Away side structural stability supports X2 coverage ({away_xg} xG)."
-                            elif market_roll == "Double Chance 1X" and home_xg >= away_xg - 0.2:
-                                market = "Double Chance 1X"
-                                fair_prob = 0.78
-                                analysis = f"Home venue advantage and defense anchor the 1X market."
-                            elif market_roll == "Both Teams to Score (BTTS - Yes)" and total_projected_xg > 2.5:
-                                market = "Both Teams to Score (BTTS - Yes)"
-                                fair_prob = 0.74
-                                analysis = f"High offensive output from both camps (Combined xG: {total_projected_xg})."
-                            elif market_roll == "Home Team Over 0.5 Goals":
-                                market = "Home Team Over 0.5 Goals"
-                                fair_prob = 0.82
-                                analysis = f"Home scoring probability exceeds 80% based on recent attacking metrics."
-                            else:
-                                market = "Over 1.5 Match Goals"
-                                fair_prob = 0.80
-                                analysis = f"Pace and tactical flow point toward clearing the 1.5 goal threshold."
+                kickoff_str = comp.get("date") or event.get("date") or ""
+                kickoff_dt: datetime | None = None
+                if kickoff_str:
+                    try:
+                        kickoff_dt = datetime.fromisoformat(kickoff_str.replace("Z", "+00:00"))
+                    except ValueError:
+                        kickoff_dt = None
 
-                            odds = prob_to_betpawa_odds(fair_prob)
-                            trust = round(rng.uniform(9.6, 9.9), 1)
+                # Keep matches that have not finished yet and fall inside the selected window
+                if kickoff_dt is not None:
+                    if kickoff_dt < (now_utc - timedelta(hours=3)):
+                        continue
+                    if kickoff_dt > cutoff_utc:
+                        continue
 
-                            analyzed_matches[match_key] = {
-                                "home": home_name,
-                                "away": away_name,
-                                "home_score": home_score,
-                                "away_score": away_score,
-                                "status": status_type,
-                                "kickoff": match_date_str,
-                                "league": clean_league_name,
-                                "market": market,
-                                "odds": odds,
-                                "trust": trust,
-                                "xg": f"{home_xg} - {away_xg}",
-                                "analysis": analysis,
-                            }
-                            league_counts[clean_league_name] = league_counts.get(clean_league_name, 0) + 1
+                fixture = {
+                    "id": ev_id,
+                    "league": league_name,
+                    "weight": weight,
+                    "home": home_team,
+                    "away": away_team,
+                    "matchup": f"{home_team} vs {away_team}",
+                    "kickoff": kickoff_dt.strftime("%b %d %H:%M UTC") if kickoff_dt else "Upcoming",
+                    "status": short_detail or state_str or "Scheduled",
+                    "status_detail": name_str,
+                    "is_completed": completed,
+                }
 
-    return analyzed_matches, league_counts
+                if not is_upcoming_fixture(fixture):
+                    continue
 
-# --- Sidebar Window & Controls ---
-window_choice = st.sidebar.selectbox(
-    "Fixture Window",
-    options=["Today & Tomorrow (48h)", "Today Only (24h)", "3-Day Schedule"],
-    index=0
-)
-days_map = {"Today Only (24h)": 1, "Today & Tomorrow (48h)": 2, "3-Day Schedule": 3}
+                seen_ids.add(ev_id)
+                all_upcoming.append(fixture)
+                league_counts[league_name] = league_counts.get(league_name, 0) + 1
 
-MATCH_POOL_DICT, LEAGUE_COUNTS = fetch_real_life_matches(days_ahead=days_map[window_choice])
-MATCH_POOL = list(MATCH_POOL_DICT.values())
+    active_league_counts = {k: v for k, v in league_counts.items() if v > 0}
+    return all_upcoming, active_league_counts
 
-# --- Persistent Account History Loader ---
-if "slip_history" not in st.session_state:
-    st.session_state.slip_history = []
 
-if supabase and st.session_state.authenticated_user and not st.session_state.slip_history:
-    try:
-        saved_db_slips = supabase.table("user_tickets").select("*").eq("username", st.session_state.authenticated_user).order("created_at", desc=True).execute()
-        if saved_db_slips.data:
-            st.session_state.slip_history = [s["ticket_data"] for s in saved_db_slips.data]
-    except Exception:
-        pass
+# ==============================================================================
+# SLIP GENERATOR (STRICTLY UPCOMING FIXTURES ONLY)
+# ==============================================================================
+def build_smart_slip(
+    fixtures: list[dict[str, Any]],
+    target_odds: float,
+    market_multiplier: float,
+) -> tuple[list[dict[str, Any]], float]:
+    eligible = [f for f in fixtures if is_upcoming_fixture(f)]
+    if not eligible:
+        return [], 1.0
 
-if st.session_state.slip_history:
-    recalculate_ai_weights(st.session_state.slip_history)
+    rng = random.Random()
+    pool = eligible.copy()
+    rng.shuffle(pool)
 
-# --- Hero Stats ---
-top_learned_market = max(st.session_state.market_weights.items(), key=lambda x: x[1])
-col_s1, col_s2, col_s3 = st.columns(3)
-col_s1.markdown(f'<div class="terminal-stat-card"><div class="terminal-stat-val">{top_learned_market[1]:.2f}x</div><div class="terminal-stat-lbl">Top Market Weight</div></div>', unsafe_allow_html=True)
-col_s2.markdown(f'<div class="terminal-stat-card"><div class="terminal-stat-val">{len(MATCH_POOL)}</div><div class="terminal-stat-lbl">Active Fixtures</div></div>', unsafe_allow_html=True)
-col_s3.markdown(f'<div class="terminal-stat-card"><div class="terminal-stat-val">{len(st.session_state.mistake_log)}</div><div class="terminal-stat-lbl">Neural Penalties</div></div>', unsafe_allow_html=True)
+    selected_legs: list[dict[str, Any]] = []
+    running_odds = 1.0
+    max_legs = min(10, len(pool))
 
-st.markdown("<br>", unsafe_allow_html=True)
+    for fix in pool:
+        if len(selected_legs) >= max_legs:
+            break
+        if running_odds >= target_odds and len(selected_legs) >= 2:
+            break
 
-if st.sidebar.button("Refresh Feed Cache"):
-    st.cache_data.clear()
-    st.rerun()
+        # Pick a market whose adjusted odds help reach target_odds cleanly
+        candidates = sorted(
+            MARKET_TEMPLATES,
+            key=lambda m: abs((running_odds * round(m["base_odds"] * fix.get("weight", 1.0) * market_multiplier, 2)) - target_odds),
+        )
+        chosen_mkt = candidates[0] if running_odds * 1.4 < target_odds else rng.choice(MARKET_TEMPLATES[:4])
+        leg_odds = round(max(1.15, chosen_mkt["base_odds"] * fix.get("weight", 1.0) * market_multiplier), 2)
 
-if st.sidebar.button("Lock Terminal Session"):
-    st.session_state.authenticated_user = None
-    st.session_state.slip_history = []
-    st.rerun()
+        selected_legs.append(
+            {
+                "matchup": fix["matchup"],
+                "league": fix["league"],
+                "kickoff": fix["kickoff"],
+                "status": fix["status"],
+                "market": chosen_mkt["market"],
+                "odds": leg_odds,
+            }
+        )
+        running_odds = round(running_odds * leg_odds, 2)
 
-if st.sidebar.button("Reset Neural Weights"):
-    st.session_state.market_weights = DEFAULT_MARKET_WEIGHTS.copy()
-    st.session_state.league_weights = {}
-    st.session_state.mistake_log = []
-    save_weights_to_supabase()
-    st.sidebar.success("Weights reset to baseline.")
+    return selected_legs, running_odds
 
-with st.sidebar.expander("League Feed Status (16 Leagues)", expanded=False):
-    active_leagues = {k: v for k, v in LEAGUE_COUNTS.items() if v > 0}
-    if active_leagues:
-        for lg_name, count in sorted(active_leagues.items(), key=lambda x: x[1], reverse=True):
-            st.markdown(f"• **{lg_name}**: `{count}`")
-    else:
-        st.warning("No active fixtures currently returned.")
 
-# --- Configuration Panel ---
-st.markdown("### Terminal Slip Generator")
-col_cfg1, col_cfg2 = st.columns(2)
-with col_cfg1:
-    target_odds = st.number_input("Target Total Odds:", min_value=1.10, max_value=10.00, value=3.50, step=0.25)
-with col_cfg2:
-    stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, value=5000, step=500)
-
-st.markdown("<br>", unsafe_allow_html=True)
-
-if "generated_slip" not in st.session_state:
-    st.session_state.generated_slip = []
-if "slip_title" not in st.session_state:
-    st.session_state.slip_title = "Accumulator Slip"
-
-def record_slip(legs, title, odds, stake, payout):
-    timestamp = datetime.now().strftime("%H:%M:%S")
-    ticket_payload = {
-        "id": len(st.session_state.slip_history) + 1,
-        "time": timestamp,
-        "title": title,
-        "odds": odds,
-        "stake": stake,
-        "payout": payout,
-        "legs": legs,
-        "status": "Pending"
-    }
-    st.session_state.slip_history.insert(0, ticket_payload)
-
-    if supabase and st.session_state.authenticated_user:
-        try:
-            supabase.table("user_tickets").insert({
-                "username": st.session_state.authenticated_user,
-                "ticket_data": ticket_payload
-            }).execute()
-        except Exception:
-            pass
-
-if st.button("Generate Smart Terminal Slip"):
-    if not MATCH_POOL:
-        st.error("No active fixtures found across the 16 whitelisted leagues in the selected window.")
-    else:
-        scored_pool = []
-        for m in MATCH_POOL:
-            m_weight = st.session_state.market_weights.get(m["market"], 1.0)
-            l_weight = st.session_state.league_weights.get(m["league"], 1.0)
-            ai_score = m["trust"] * m_weight * l_weight * random.uniform(0.95, 1.05)
-            scored_pool.append((ai_score, m_weight, m))
-
-        scored_pool.sort(key=lambda x: x[0], reverse=True)
-
-        selected_legs, current_prod = [], 1.0
-        for ai_score, m_weight, match in scored_pool:
-            if m_weight < 0.45 and len(scored_pool) > 4:
-                continue
-            if current_prod < target_odds and len(selected_legs) < 10:
-                match_copy = match.copy()
-                match_copy["ai_weight"] = m_weight
-                selected_legs.append(match_copy)
-                current_prod *= match["odds"]
-
-        st.session_state.generated_slip = selected_legs
-        st.session_state.slip_title = "PROBABILITY ACCUMULATOR SLIP"
-        
-        total_odds_prod = 1.0
-        for l in selected_legs:
-            total_odds_prod *= l.get("odds", 1.20)
-
-        payout_calc = total_odds_prod * stake_amount * (1 + min(len(selected_legs)*5, 100)/100)
-        record_slip(selected_legs, st.session_state.slip_title, round(total_odds_prod, 2), stake_amount, payout_calc)
-
-# --- Active Betslip Display ---
-st.markdown("---")
-st.subheader(st.session_state.slip_title)
-
-if st.session_state.generated_slip:
-    total_odds = 1.0
-    for leg in st.session_state.generated_slip:
-        total_odds *= leg.get("odds", 1.20)
-
-    bonus = min(len(st.session_state.generated_slip) * 5, 100)
-    final_payout = total_odds * stake_amount * (1 + bonus / 100)
-
+# ==============================================================================
+# AUTHENTICATION SCREEN
+# ==============================================================================
+def render_auth_screen(sb: Client | None) -> None:
+    st.title("ALPHASTAKE")
+    mode_badge = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
     st.markdown(
-        f"""
-        <div class="glass-card" style="border-color: #059669;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="margin: 0; color: #10B981; font-size: 22px;">Total Odds: {round(total_odds, 2)}x</h3>
-                <span style="color: #3B82F6; font-weight: 600; font-size: 13px;">+{bonus}% Accumulator Bonus</span>
-            </div>
-            <p style="margin: 8px 0 0 0; font-size: 14px; color: #94A3B8;">
-                Stake: <b style="color: #F8FAFC;">{stake_amount:,.0f} UGX</b> &nbsp;|&nbsp; 
-                Est. Return: <b style="color: #10B981;">{final_payout:,.0f} UGX</b>
-            </p>
-        </div>
-    """,
+        f'<span class="badge-pill {"" if sb else "badge-local"}">{mode_badge}</span>'
+        f'<span class="badge-pill">17 LEAGUES ACTIVE</span>',
+        unsafe_allow_html=True,
+    )
+    st.caption("Sign in or create an operator account to access the trading terminal.")
+
+    tab_login, tab_register = st.tabs(["Sign In", "Register"])
+
+    with tab_login:
+        with st.form("login_form"):
+            username = st.text_input("Username").strip().lower()
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Access Terminal", type="primary")
+
+        if submitted:
+            if not username or not password:
+                st.error("Enter both username and password.")
+                return
+            pw_hash = hash_password(password)
+            if sb:
+                user_row = fetch_user_record(sb, username)
+                if not user_row:
+                    st.error("Account not found in database. Switch to Register to create it.")
+                    return
+                stored_pw = user_row.get("password", "")
+                if pw_hash != stored_pw and password != stored_pw:
+                    st.error("Invalid password.")
+                    return
+                st.session_state.authenticated = True
+                st.session_state.username = username
+                st.session_state.weights = user_row.get("weights") or {"market_multiplier": 1.00, "penalties": 0}
+                st.session_state.tickets = load_user_tickets(sb, username)
+                st.rerun()
+            else:
+                st.session_state.authenticated = True
+                st.session_state.username = username
+                st.rerun()
+
+    with tab_register:
+        with st.form("register_form"):
+            new_user = st.text_input("Choose Username").strip().lower()
+            new_pw = st.text_input("Choose Password", type="password")
+            confirm_pw = st.text_input("Confirm Password", type="password")
+            reg_submitted = st.form_submit_button("Create Account", type="primary")
+
+        if reg_submitted:
+            if not new_user or not new_pw:
+                st.error("Username and password are required.")
+                return
+            if new_pw != confirm_pw:
+                st.error("Passwords do not match.")
+                return
+
+            default_weights = {"market_multiplier": 1.00, "penalties": 0}
+            pw_hash = hash_password(new_pw)
+
+            if sb:
+                existing = fetch_user_record(sb, new_user)
+                if existing:
+                    st.error("Username already exists. Sign in instead.")
+                    return
+                sb.table("users").insert(
+                    {
+                        "username": new_user,
+                        "password": pw_hash,
+                        "weights": default_weights,
+                    }
+                ).execute()
+                st.session_state.authenticated = True
+                st.session_state.username = new_user
+                st.session_state.weights = default_weights
+                st.session_state.tickets = []
+                st.success("Account created. Entering terminal...")
+                st.rerun()
+            else:
+                st.session_state.authenticated = True
+                st.session_state.username = new_user
+                st.session_state.weights = default_weights
+                st.session_state.tickets = []
+                st.rerun()
+
+
+# ==============================================================================
+# MAIN TERMINAL
+# ==============================================================================
+def render_terminal(sb: Client | None) -> None:
+    window_options = {
+        "Today & Tomorrow (48h)": 2,
+        "3-Day Schedule": 3,
+        "7-Day Schedule": 7,
+    }
+
+    with st.sidebar:
+        st.subheader("Fixture Window")
+        selected_window_label = st.selectbox(
+            "Fixture Window",
+            list(window_options.keys()),
+            index=0,
+            label_visibility="collapsed",
+        )
+        window_days = window_options[selected_window_label]
+
+        if st.button("Refresh Feed Cache", use_container_width=True):
+            st.session_state.fixture_cache_bust += 1
+            fetch_espn_fixtures.clear()
+            st.rerun()
+
+        if st.button("Lock Terminal Session", use_container_width=True):
+            st.session_state.authenticated = False
+            st.session_state.current_slip = []
+            st.rerun()
+
+        if st.button("Reset Neural Weights", use_container_width=True):
+            reset_w = {"market_multiplier": 1.00, "penalties": 0}
+            update_weights_in_db(sb, st.session_state.username, reset_w)
+            st.rerun()
+
+        fixtures, active_leagues = fetch_espn_fixtures(
+            window_days=window_days,
+            cache_bust=st.session_state.fixture_cache_bust,
+        )
+
+        with st.expander(f"League Feed Status ({len(active_leagues)} Leagues)", expanded=False):
+            if active_leagues:
+                for lg_name, cnt in sorted(active_leagues.items(), key=lambda x: (-x[1], x[0])):
+                    st.markdown(f"• *{lg_name}* : {cnt}")
+            else:
+                st.caption("No upcoming fixtures found in this window.")
+
+    weights = st.session_state.weights
+    multiplier = float(weights.get("market_multiplier", 1.00))
+    penalties = int(weights.get("penalties", 0))
+    sync_label = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
+
+    st.title("ALPHASTAKE")
+    st.markdown(
+        f"Operator Session Active "
+        f'<span class="badge-pill {"" if sb else "badge-local"}">{sync_label}</span> '
+        f"**{multiplier:.2f}x** TOP MARKET WEIGHT "
+        f"**{len(fixtures)}** ACTIVE FIXTURES "
+        f"**{penalties}** NEURAL PENALTIES",
         unsafe_allow_html=True,
     )
 
-    slip_text = f"*ALPHASTAKE ACCUMULATOR SLIP*\nOdds: {round(total_odds, 2)}x | Stake: {stake_amount:,} UGX | Est Return: {final_payout:,.0f} UGX\n" + "-" * 30 + "\n"
-    for i, leg in enumerate(st.session_state.generated_slip, 1):
-        match_key = f"{leg.get('home')} vs {leg.get('away')}"
-        live_match = MATCH_POOL_DICT.get(match_key, leg)
-        status = live_match.get("status", "Scheduled")
-        kickoff = live_match.get("kickoff", "")
-        h_s = live_match.get("home_score", 0)
-        a_s = live_match.get("away_score", 0)
-        ai_w = leg.get("ai_weight", st.session_state.market_weights.get(leg.get("market"), 1.0))
-        
-        status_tag = f"LIVE ({h_s} - {a_s})" if "In Progress" in status or "Half" in status else (f"FT ({h_s} - {a_s})" if "Final" in status or "FT" in status else kickoff)
-        
+    # --------------------------------------------------------------------------
+    # TERMINAL SLIP GENERATOR
+    # --------------------------------------------------------------------------
+    st.header("Terminal Slip Generator")
+    col_odds, col_stake = st.columns(2)
+    with col_odds:
+        target_odds = st.number_input("Target Total Odds:", min_value=1.20, max_value=100.0, value=3.50, step=0.25)
+    with col_stake:
+        stake_amount = st.number_input("Stake Amount (UGX):", min_value=500, max_value=50_000_000, value=5000, step=500)
+
+    if st.button("Generate Smart Terminal Slip", type="primary"):
+        legs, total_odds = build_smart_slip(
+            fixtures=fixtures,
+            target_odds=float(target_odds),
+            market_multiplier=multiplier,
+        )
+        if not legs:
+            st.warning("No upcoming (unplayed) fixtures found in the selected window. Try 7-Day Schedule or click Refresh Feed Cache.")
+        else:
+            st.session_state.current_slip = legs
+            next_num = len(st.session_state.tickets) + 1
+            est_payout = int(round(stake_amount * total_odds))
+            new_ticket = {
+                "ticket_no": next_num,
+                "odds": total_odds,
+                "stake": int(stake_amount),
+                "est_payout": est_payout,
+                "status": "Pending",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "legs": legs,
+            }
+            save_ticket_to_db(sb, st.session_state.username, new_ticket)
+            if sb:
+                st.session_state.tickets = load_user_tickets(sb, st.session_state.username)
+            st.rerun()
+
+    # --------------------------------------------------------------------------
+    # ACCUMULATOR SLIP (UPCOMING MATCHES ONLY)
+    # --------------------------------------------------------------------------
+    st.header("Accumulator Slip")
+    active_slip = st.session_state.get("current_slip") or (
+        st.session_state.tickets[-1].get("legs", []) if st.session_state.tickets else []
+    )
+    upcoming_slip_legs = [leg for leg in active_slip if is_upcoming_fixture(leg)]
+
+    if upcoming_slip_legs:
+        slip_odds = 1.0
+        for idx, leg in enumerate(upcoming_slip_legs, start=1):
+            slip_odds = round(slip_odds * float(leg["odds"]), 2)
+            st.markdown(
+                f'<div class="leg-row"><strong>{idx}. {leg["matchup"]}</strong> '
+                f'({leg["league"]} · {leg["kickoff"]}) → '
+                f'{leg["market"]} <strong>@ {float(leg["odds"]):.2f}</strong></div>',
+                unsafe_allow_html=True,
+            )
+        est_return = int(round(stake_amount * slip_odds))
+        st.caption(f"Combined Odds: **{slip_odds:.2f}x** · Est. Payout: **{est_return:,} UGX** (Upcoming fixtures only)")
+    else:
+        st.caption("No active slip generated yet. Click **Generate Smart Terminal Slip** above.")
+
+    # --------------------------------------------------------------------------
+    # SESSION P&L ANALYTICS
+    # --------------------------------------------------------------------------
+    st.header("Session P&L Analytics")
+    tickets = st.session_state.tickets
+    total_staked = sum(int(t.get("stake", 0)) for t in tickets)
+    settled = [t for t in tickets if t.get("status") in {"Won", "Lost"}]
+    won_tickets = [t for t in settled if t.get("status") == "Won"]
+
+    net_pnl = 0
+    for t in settled:
+        st_val = int(t.get("stake", 0))
+        if t.get("status") == "Won":
+            net_pnl += int(t.get("est_payout", round(st_val * float(t.get("odds", 1.0))))) - st_val
+        else:
+            net_pnl -= st_val
+
+    roi_pct = (net_pnl / total_staked * 100.0) if total_staked > 0 else 0.0
+    win_rate = (len(won_tickets) / len(settled) * 100.0) if settled else 0.0
+
+    k1, k2, k3 = st.columns(3)
+    with k1:
         st.markdown(
-            f"""
-            <div class="glass-card">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                    <b style="font-size: 15px; color: #F8FAFC;">{i}. {leg.get('home')} vs {leg.get('away')}</b>
-                    <span class="badge-status">{status_tag}</span>
-                </div>
-                <div style="font-size: 11px; color: #10B981; margin-bottom: 4px; font-weight: 600;">{leg.get('league')} &nbsp;|&nbsp; Weight: {ai_w:.2f}x</div>
-                <div style="margin: 6px 0;">
-                    Selection: <span class="badge-market">{leg.get('market')}</span> &nbsp; Odds: <b style="color: #10B981;">{leg.get('odds')}</b>
-                </div>
-                <div style="font-size: 11px; color: #64748B; margin-top: 4px;">xG Projection: {leg.get('xg')}</div>
-                <div class="analysis-text"><b>AI Logic:</b> {leg.get('analysis')}</div>
-            </div>
-            """,
+            f'<div class="kpi-box"><div class="kpi-label">Net P&L</div>'
+            f'<div class="kpi-value">{net_pnl:+,} UGX</div>'
+            f'<div>{roi_pct:+.1f}% ROI</div></div>',
             unsafe_allow_html=True,
         )
-        slip_text += f"{i}. {leg.get('home')} vs {leg.get('away')} ({leg.get('league')}) -> {leg.get('market')} @ {leg.get('odds')}\n"
+    with k2:
+        st.markdown(
+            f'<div class="kpi-box"><div class="kpi-label">Total Staked</div>'
+            f'<div class="kpi-value">{total_staked:,} UGX</div></div>',
+            unsafe_allow_html=True,
+        )
+    with k3:
+        st.markdown(
+            f'<div class="kpi-box"><div class="kpi-label">Win Rate</div>'
+            f'<div class="kpi-value">{win_rate:.1f}%</div>'
+            f'<div>{len(won_tickets)}/{len(settled)} Settled</div></div>',
+            unsafe_allow_html=True,
+        )
 
-    encoded_text = urllib.parse.quote(slip_text)
-    whatsapp_url = f"https://api.whatsapp.com/send?text={encoded_text}"
-    st.markdown(f'<a href="{whatsapp_url}" target="_blank" style="text-decoration: none;"><div style="background: #10B981; color: #050505; padding: 12px 20px; border-radius: 10px; text-align: center; font-weight: 700; font-size: 14px; margin-bottom: 14px;">Share Betslip on WhatsApp</div></a>', unsafe_allow_html=True)
-    st.text_area("Booking Text Output", slip_text, height=110)
-
-# --- Profit & Loss Dashboard ---
-st.markdown("---")
-st.subheader("Session P&L Analytics")
-
-total_staked = sum(ticket["stake"] for ticket in st.session_state.slip_history)
-total_won_payouts = sum(ticket["payout"] for ticket in st.session_state.slip_history if ticket["status"] == "Won")
-net_pnl = total_won_payouts - total_staked
-
-settled_tickets = [t for t in st.session_state.slip_history if t["status"] in ["Won", "Lost"]]
-win_rate = (len([t for t in settled_tickets if t["status"] == "Won"]) / len(settled_tickets) * 100) if settled_tickets else 0.0
-roi = (net_pnl / total_staked * 100) if total_staked > 0 else 0.0
-
-col_p1, col_p2, col_p3 = st.columns(3)
-col_p1.metric("Net P&L", f"{net_pnl:+,.0f} UGX", delta=f"{roi:.1f}% ROI")
-col_p2.metric("Total Staked", f"{total_staked:,.0f} UGX")
-col_p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len([t for t in settled_tickets if t['status']=='Won'])}/{len(settled_tickets)} Settled")
-
-# --- Interactive History Log ---
-st.markdown("<br>", unsafe_allow_html=True)
-st.subheader("Terminal History & Training")
-
-if st.session_state.slip_history:
+    # --------------------------------------------------------------------------
+    # TERMINAL HISTORY & TRAINING
+    # --------------------------------------------------------------------------
+    st.header("Terminal History & Training")
     if st.button("Clear History Log"):
-        st.session_state.slip_history = []
-        if supabase and st.session_state.authenticated_user:
-            supabase.table("user_tickets").delete().eq("username", st.session_state.authenticated_user).execute()
-        recalculate_ai_weights([])
+        if sb:
+            sb.table("user_tickets").delete().eq("username", st.session_state.username).execute()
+        st.session_state.tickets = []
+        st.session_state.current_slip = []
         st.rerun()
 
-    for idx, past_slip in enumerate(st.session_state.slip_history):
-        status_label = past_slip['status']
-        status_tag = "Pending" if status_label == "Pending" else ("Won" if status_label == "Won" else "Lost")
-        
-        with st.expander(f"Ticket #{past_slip['id']} | {past_slip['odds']}x — [{status_tag}]"):
-            st.markdown(f"**Stake:** {past_slip['stake']:,} UGX | **Est Payout:** **{past_slip['payout']:,.0f} UGX**")
-            
-            btn_col1, btn_col2, btn_col3 = st.columns(3)
-            with btn_col1:
-                if st.button("Mark Won", key=f"won_{idx}"):
-                    st.session_state.slip_history[idx]["status"] = "Won"
-                    recalculate_ai_weights(st.session_state.slip_history)
-                    sync_tickets_to_supabase()
+    for idx, ticket in enumerate(reversed(tickets)):
+        t_num = ticket.get("ticket_no", len(tickets) - idx)
+        t_odds = float(ticket.get("odds", 1.0))
+        t_status = ticket.get("status", "Pending")
+        t_stake = int(ticket.get("stake", 5000))
+        t_payout = int(ticket.get("est_payout", round(t_stake * t_odds)))
+        t_legs = ticket.get("legs") or []
+
+        with st.expander(f"Ticket #{t_num} | {t_odds:.2f}x — [{t_status}]", expanded=(idx < 2)):
+            st.markdown(f"*Stake:* {t_stake:,} UGX | *Est Payout:* *{t_payout:,} UGX*")
+            b1, b2, b3 = st.columns(3)
+            with b1:
+                if st.button("Mark Won", key=f"won_{t_num}_{idx}"):
+                    updated_w = {
+                        "market_multiplier": round(min(1.30, multiplier + 0.01), 2),
+                        "penalties": penalties,
+                    }
+                    update_ticket_status_in_db(sb, st.session_state.username, ticket, "Won")
+                    update_weights_in_db(sb, st.session_state.username, updated_w)
                     st.rerun()
-            with btn_col2:
-                if st.button("Mark Lost", key=f"lost_{idx}"):
-                    st.session_state.slip_history[idx]["status"] = "Lost"
-                    recalculate_ai_weights(st.session_state.slip_history)
-                    sync_tickets_to_supabase()
+            with b2:
+                if st.button("Mark Lost", key=f"lost_{t_num}_{idx}"):
+                    updated_w = {
+                        "market_multiplier": round(max(0.80, multiplier - 0.01), 2),
+                        "penalties": penalties + 1,
+                    }
+                    update_ticket_status_in_db(sb, st.session_state.username, ticket, "Lost")
+                    update_weights_in_db(sb, st.session_state.username, updated_w)
                     st.rerun()
-            with btn_col3:
-                if st.button("Reset Pending", key=f"pend_{idx}"):
-                    st.session_state.slip_history[idx]["status"] = "Pending"
-                    recalculate_ai_weights(st.session_state.slip_history)
-                    sync_tickets_to_supabase()
+            with b3:
+                if st.button("Reset Pending", key=f"pend_{t_num}_{idx}"):
+                    update_ticket_status_in_db(sb, st.session_state.username, ticket, "Pending")
                     st.rerun()
 
-            st.markdown("---")
-            for leg_idx, l in enumerate(past_slip["legs"], 1):
-                st.markdown(f"&nbsp;&nbsp;{leg_idx}. {l.get('home')} vs {l.get('away')} -> {l.get('market')} @ {l.get('odds')}")
-else:
-    st.caption("No account tickets generated yet.")
+            for l_idx, leg in enumerate(t_legs, start=1):
+                st.markdown(
+                    f"&nbsp;&nbsp;{l_idx}. {leg.get('matchup', 'Match')} → "
+                    f"{leg.get('market', 'Market')} @ {float(leg.get('odds', 1.0)):.2f}"
+                )
+
+
+# ==============================================================================
+# ENTRYPOINT
+# ==============================================================================
+def main() -> None:
+    init_session_state()
+    sb = get_supabase_client()
+    if not st.session_state.authenticated:
+        render_auth_screen(sb)
+    else:
+        render_terminal(sb)
+
+
+if __name__ == "__main__":
+    main()
