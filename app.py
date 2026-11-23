@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
+import html
 import random
 from typing import Any
 
@@ -8,7 +9,7 @@ import streamlit as st
 from supabase import Client, create_client
 
 # ==============================================================================
-# PAGE CONFIG & EXCLUSIVE 16 LEAGUES (BRAZILIAN SERIE A REMOVED)
+# PAGE CONFIG & EXCLUSIVE 16 LEAGUES
 # ==============================================================================
 st.set_page_config(
     page_title="ALPHASTAKE // TERMINAL",
@@ -120,224 +121,214 @@ def is_upcoming_fixture(item: Any) -> bool:
 
 
 # ==============================================================================
-# MINIMALIST QUANT TERMINAL THEME
+# ULTRA-MINIMAL FLAT BLACK TERMINAL THEME
 # ==============================================================================
 st.markdown(
     """
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
         html, body, [class*="css"] {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: #050505;
+            color: #e4e4e7;
         }
         code, pre, .mono {
             font-family: 'JetBrains Mono', monospace !important;
             font-variant-numeric: tabular-nums;
         }
         .stApp {
-            background: radial-gradient(circle at 12% 0%, #0d1b2a 0%, #070b12 45%, #05070c 100%);
-            color: #e6edf3;
+            background-color: #050505;
+            color: #e4e4e7;
         }
         .block-container {
-            padding-top: 2rem;
-            padding-bottom: 3.5rem;
-            max-width: 1220px;
+            padding-top: 1.75rem;
+            padding-bottom: 3rem;
+            max-width: 1080px;
         }
         section[data-testid="stSidebar"] {
-            background-color: #090e17;
-            border-right: 1px solid rgba(148, 163, 184, 0.12);
+            background-color: #09090b;
+            border-right: 1px solid #1f1f23;
         }
-        .terminal-header {
+        .term-topbar {
             display: flex;
             flex-wrap: wrap;
-            align-items: baseline;
+            align-items: center;
             justify-content: space-between;
             gap: 0.75rem;
-            padding-bottom: 1rem;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.14);
-            margin-bottom: 1.4rem;
+            padding-bottom: 0.85rem;
+            border-bottom: 1px solid #27272a;
+            margin-bottom: 1rem;
         }
-        .brand-title {
+        .term-title {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 1.75rem;
+            font-size: 1.25rem;
             font-weight: 700;
-            letter-spacing: 0.14em;
-            color: #f8fafc;
+            letter-spacing: 0.16em;
+            color: #fafafa;
             margin: 0;
         }
-        .brand-sub {
-            font-size: 0.78rem;
-            letter-spacing: 0.12em;
+        .term-meta {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.74rem;
+            letter-spacing: 0.08em;
+            color: #71717a;
             text-transform: uppercase;
-            color: #64748b;
+        }
+        .status-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 0.2rem 0.5rem;
+            border: 1px solid #27272a;
+            color: #10b981;
+            background: #09090b;
+        }
+        .status-tag.warn {
+            color: #f59e0b;
+        }
+        .stat-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            border-top: 1px solid #1f1f23;
+            border-bottom: 1px solid #1f1f23;
+            margin-bottom: 1.5rem;
+        }
+        @media (max-width: 768px) {
+            .stat-bar { grid-template-columns: repeat(2, 1fr); }
+        }
+        .stat-cell {
+            padding: 0.65rem 0.85rem;
+            border-right: 1px solid #1f1f23;
+        }
+        .stat-cell:last-child {
+            border-right: none;
+        }
+        .stat-k {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #71717a;
+        }
+        .stat-v {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #fafafa;
             margin-top: 0.15rem;
         }
-        .status-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.45rem;
-            padding: 0.28rem 0.7rem;
-            border-radius: 6px;
+        .sec-head {
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.73rem;
+            font-size: 0.74rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: #a1a1aa;
+            padding-bottom: 0.45rem;
+            border-bottom: 1px solid #27272a;
+            margin-top: 1.5rem;
+            margin-bottom: 0.85rem;
+        }
+        .term-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.84rem;
+            margin-bottom: 0.6rem;
+        }
+        .term-table th {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.69rem;
+            font-weight: 600;
+            letter-spacing: 0.09em;
+            text-transform: uppercase;
+            color: #71717a;
+            text-align: left;
+            padding: 0.45rem 0.6rem;
+            border-bottom: 1px solid #27272a;
+        }
+        .term-table th.num, .term-table td.num {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+        .term-table td {
+            padding: 0.52rem 0.6rem;
+            border-bottom: 1px solid #18181b;
+            color: #e4e4e7;
+            vertical-align: middle;
+        }
+        .term-table tr:hover td {
+            background-color: #0b0b0e;
+        }
+        .td-muted {
+            color: #71717a !important;
+            font-size: 0.78rem;
+        }
+        .td-odds {
+            color: #10b981 !important;
+            font-weight: 600;
+        }
+        .term-summary-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.55rem 0.6rem;
+            border-top: 1px solid #27272a;
+            border-bottom: 1px solid #27272a;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: #fafafa;
+            background-color: #09090b;
+        }
+        .pnl-bar {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            border-top: 1px solid #1f1f23;
+            border-bottom: 1px solid #1f1f23;
+        }
+        @media (max-width: 768px) {
+            .pnl-bar { grid-template-columns: 1fr; }
+        }
+        .pnl-cell {
+            padding: 0.7rem 0.85rem;
+            border-right: 1px solid #1f1f23;
+        }
+        .pnl-cell:last-child {
+            border-right: none;
+        }
+        .pos { color: #10b981 !important; }
+        .neg { color: #ef4444 !important; }
+        .stButton > button {
+            border-radius: 0px !important;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
             font-weight: 600;
             letter-spacing: 0.06em;
             text-transform: uppercase;
-            background: rgba(16, 185, 129, 0.08);
-            color: #34d399;
-            border: 1px solid rgba(52, 211, 153, 0.28);
+            background-color: #09090b;
+            color: #e4e4e7;
+            border: 1px solid #27272a;
         }
-        .status-chip.warn {
-            background: rgba(245, 158, 11, 0.08);
-            color: #fbbf24;
-            border-color: rgba(251, 191, 36, 0.28);
-        }
-        .dot-live {
-            width: 6px;
-            height: 6px;
-            border-radius: 50%;
-            background: #34d399;
-            box-shadow: 0 0 8px #34d399;
-        }
-        .telemetry-strip {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
-            gap: 0.75rem;
-            margin-bottom: 1.75rem;
-        }
-        .tele-card {
-            background: rgba(15, 23, 42, 0.55);
-            border: 1px solid rgba(148, 163, 184, 0.14);
-            border-radius: 10px;
-            padding: 0.8rem 0.95rem;
-        }
-        .tele-label {
-            font-size: 0.7rem;
-            font-weight: 600;
-            letter-spacing: 0.09em;
-            text-transform: uppercase;
-            color: #94a3b8;
-            margin-bottom: 0.3rem;
-        }
-        .tele-val {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.15rem;
-            font-weight: 700;
-            color: #f8fafc;
-            font-variant-numeric: tabular-nums;
-        }
-        .panel-card {
-            background: rgba(13, 19, 31, 0.72);
-            border: 1px solid rgba(148, 163, 184, 0.14);
-            border-radius: 12px;
-            padding: 1.15rem 1.25rem;
-            margin-bottom: 1.25rem;
-        }
-        .panel-title {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.82rem;
-            font-weight: 600;
-            letter-spacing: 0.11em;
-            text-transform: uppercase;
-            color: #cbd5e1;
-            margin-bottom: 0.9rem;
-        }
-        .slip-leg {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.75rem 0.9rem;
-            margin-bottom: 0.55rem;
-            border-radius: 8px;
-            background: rgba(2, 6, 23, 0.65);
-            border: 1px solid rgba(148, 163, 184, 0.11);
-            border-left: 3px solid #10b981;
-        }
-        .leg-match {
-            font-weight: 600;
-            font-size: 0.94rem;
-            color: #f1f5f9;
-        }
-        .leg-meta {
-            font-size: 0.76rem;
-            color: #94a3b8;
-            margin-top: 0.15rem;
-        }
-        .leg-right {
-            text-align: right;
-            white-space: nowrap;
-        }
-        .leg-mkt {
-            font-size: 0.82rem;
-            color: #cbd5e1;
-        }
-        .leg-odds {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: #34d399;
-        }
-        .slip-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-top: 0.75rem;
-            margin-top: 0.35rem;
-            border-top: 1px dashed rgba(148, 163, 184, 0.2);
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.88rem;
-            color: #e2e8f0;
-        }
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 0.85rem;
-        }
-        @media (max-width: 768px) {
-            .kpi-grid { grid-template-columns: 1fr; }
-        }
-        .kpi-card {
-            background: rgba(2, 6, 23, 0.65);
-            border: 1px solid rgba(148, 163, 184, 0.14);
-            border-radius: 10px;
-            padding: 0.95rem 1.05rem;
-        }
-        .kpi-title {
-            font-size: 0.72rem;
-            letter-spacing: 0.09em;
-            text-transform: uppercase;
-            color: #94a3b8;
-        }
-        .kpi-num {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.45rem;
-            font-weight: 700;
-            color: #f8fafc;
-            margin: 0.25rem 0;
-            font-variant-numeric: tabular-nums;
-        }
-        .kpi-num.pos { color: #34d399; }
-        .kpi-num.neg { color: #f87171; }
-        .kpi-sub {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.75rem;
-            color: #64748b;
-        }
-        .stButton > button {
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.84rem;
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            transition: all 0.15s ease;
+        .stButton > button:hover {
+            border-color: #52525b;
+            color: #fafafa;
         }
         .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-            color: #04130d;
-            border: none;
+            background-color: #10b981;
+            color: #050505;
+            border: 1px solid #10b981;
         }
         .stButton > button[kind="primary"]:hover {
-            filter: brightness(1.08);
+            background-color: #34d399;
+            border-color: #34d399;
+        }
+        div[data-testid="stExpander"] {
+            border: 1px solid #1f1f23 !important;
+            border-radius: 0px !important;
+            background-color: #070709 !important;
         }
     </style>
     """,
@@ -615,108 +606,100 @@ def build_smart_slip(
 # AUTHENTICATION SCREEN
 # ==============================================================================
 def render_auth_screen(sb: Client | None) -> None:
-    chip_cls = "" if sb else "warn"
-    chip_txt = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
+    tag_cls = "" if sb else "warn"
+    tag_txt = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
 
     st.markdown(
         f"""
-        <div class="terminal-header">
+        <div class="term-topbar">
             <div>
-                <h1 class="brand-title">ALPHASTAKE</h1>
-                <div class="brand-sub">QUANTITATIVE MATCH ANALYTICS &amp; SLIP ENGINE</div>
+                <div class="term-title">ALPHASTAKE</div>
+                <div class="term-meta">QUANTITATIVE SLIP TERMINAL // 16 LEAGUES</div>
             </div>
-            <div>
-                <span class="status-chip {chip_cls}"><span class="dot-live"></span>{chip_txt}</span>
-                <span class="status-chip">16 LEAGUES</span>
-            </div>
+            <div><span class="status-tag {tag_cls}">{tag_txt}</span></div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    _, center_col, _ = st.columns([1, 1.35, 1])
-    with center_col:
-        st.markdown('<div class="panel-card"><div class="panel-title">Operator Authentication</div>', unsafe_allow_html=True)
-        tab_login, tab_register = st.tabs(["Sign In", "Register"])
+    tab_login, tab_register = st.tabs(["SIGN IN", "REGISTER"])
 
-        with tab_login:
-            with st.form("login_form"):
-                username = st.text_input("Username").strip().lower()
-                password = st.text_input("Password", type="password")
-                submitted = st.form_submit_button("Access Terminal", type="primary", use_container_width=True)
+    with tab_login:
+        with st.form("login_form"):
+            username = st.text_input("Operator Username").strip().lower()
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Access Terminal", type="primary")
 
-            if submitted:
-                if not username or not password:
-                    st.error("Enter both username and password.")
-                else:
-                    pw_hash = hash_password(password)
-                    if sb:
-                        user_row = fetch_user_record(sb, username)
-                        if not user_row:
-                            st.error("Account not found. Switch to Register to create an account.")
-                        else:
-                            stored_pw = user_row.get("password", "")
-                            if pw_hash != stored_pw and password != stored_pw:
-                                st.error("Invalid password.")
-                            else:
-                                st.session_state.authenticated = True
-                                st.session_state.username = username
-                                st.session_state.weights = user_row.get("weights") or {
-                                    "market_multiplier": 1.00,
-                                    "penalties": 0,
-                                }
-                                st.session_state.tickets = load_user_tickets(sb, username)
-                                st.session_state.current_slip = []
-                                st.rerun()
+        if submitted:
+            if not username or not password:
+                st.error("Enter both username and password.")
+            else:
+                pw_hash = hash_password(password)
+                if sb:
+                    user_row = fetch_user_record(sb, username)
+                    if not user_row:
+                        st.error("Account not found. Switch to Register.")
                     else:
-                        st.session_state.authenticated = True
-                        st.session_state.username = username
-                        st.rerun()
-
-        with tab_register:
-            with st.form("register_form"):
-                new_user = st.text_input("Choose Username").strip().lower()
-                new_pw = st.text_input("Choose Password", type="password")
-                confirm_pw = st.text_input("Confirm Password", type="password")
-                reg_submitted = st.form_submit_button("Create Account", type="primary", use_container_width=True)
-
-            if reg_submitted:
-                if not new_user or not new_pw:
-                    st.error("Username and password are required.")
-                elif new_pw != confirm_pw:
-                    st.error("Passwords do not match.")
-                else:
-                    default_weights = {"market_multiplier": 1.00, "penalties": 0}
-                    pw_hash = hash_password(new_pw)
-                    if sb:
-                        if fetch_user_record(sb, new_user):
-                            st.error("Username already exists. Sign in instead.")
+                        stored_pw = user_row.get("password", "")
+                        if pw_hash != stored_pw and password != stored_pw:
+                            st.error("Invalid password.")
                         else:
-                            sb.table("users").insert(
-                                {
-                                    "username": new_user,
-                                    "password": pw_hash,
-                                    "weights": default_weights,
-                                }
-                            ).execute()
                             st.session_state.authenticated = True
-                            st.session_state.username = new_user
-                            st.session_state.weights = default_weights
-                            st.session_state.tickets = []
+                            st.session_state.username = username
+                            st.session_state.weights = user_row.get("weights") or {
+                                "market_multiplier": 1.00,
+                                "penalties": 0,
+                            }
+                            st.session_state.tickets = load_user_tickets(sb, username)
                             st.session_state.current_slip = []
                             st.rerun()
+                else:
+                    st.session_state.authenticated = True
+                    st.session_state.username = username
+                    st.rerun()
+
+    with tab_register:
+        with st.form("register_form"):
+            new_user = st.text_input("Choose Username").strip().lower()
+            new_pw = st.text_input("Choose Password", type="password")
+            confirm_pw = st.text_input("Confirm Password", type="password")
+            reg_submitted = st.form_submit_button("Create Account", type="primary")
+
+        if reg_submitted:
+            if not new_user or not new_pw:
+                st.error("Username and password are required.")
+            elif new_pw != confirm_pw:
+                st.error("Passwords do not match.")
+            else:
+                default_weights = {"market_multiplier": 1.00, "penalties": 0}
+                pw_hash = hash_password(new_pw)
+                if sb:
+                    if fetch_user_record(sb, new_user):
+                        st.error("Username already exists. Sign in instead.")
                     else:
+                        sb.table("users").insert(
+                            {
+                                "username": new_user,
+                                "password": pw_hash,
+                                "weights": default_weights,
+                            }
+                        ).execute()
                         st.session_state.authenticated = True
                         st.session_state.username = new_user
                         st.session_state.weights = default_weights
                         st.session_state.tickets = []
+                        st.session_state.current_slip = []
                         st.rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
+                else:
+                    st.session_state.authenticated = True
+                    st.session_state.username = new_user
+                    st.session_state.weights = default_weights
+                    st.session_state.tickets = []
+                    st.rerun()
 
 
 # ==============================================================================
-# MAIN TERMINAL
+# MAIN TERMINAL (SINGLE-COLUMN FLAT TABLE LAYOUT)
 # ==============================================================================
 def render_terminal(sb: Client | None) -> None:
     window_options = {
@@ -726,7 +709,7 @@ def render_terminal(sb: Client | None) -> None:
     }
 
     with st.sidebar:
-        st.markdown('<div class="panel-title">Feed &amp; Session Controls</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sec-head" style="margin-top:0;">FEED &amp; SESSION</div>', unsafe_allow_html=True)
         selected_window_label = st.selectbox(
             "Fixture Window",
             list(window_options.keys()),
@@ -754,202 +737,193 @@ def render_terminal(sb: Client | None) -> None:
             cache_bust=st.session_state.fixture_cache_bust,
         )
 
-        st.markdown("---")
-        with st.expander(f"League Feed Status ({len(active_leagues)}/16)", expanded=False):
+        with st.expander(f"LEAGUE FEED ({len(active_leagues)}/16)", expanded=False):
             if active_leagues:
                 for lg_name, cnt in sorted(active_leagues.items(), key=lambda x: (-x[1], x[0])):
-                    st.markdown(f"`{cnt:02d}` · {lg_name}")
+                    st.markdown(f"`{cnt:02d}` {lg_name}")
             else:
                 st.caption("No upcoming fixtures in this window.")
 
     weights = st.session_state.weights
     multiplier = float(weights.get("market_multiplier", 1.00))
     penalties = int(weights.get("penalties", 0))
-    chip_cls = "" if sb else "warn"
-    chip_txt = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
+    tag_cls = "" if sb else "warn"
+    tag_txt = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
 
+    # Top Header & Telemetry Bar
     st.markdown(
         f"""
-        <div class="terminal-header">
+        <div class="term-topbar">
             <div>
-                <h1 class="brand-title">ALPHASTAKE</h1>
-                <div class="brand-sub">OPERATOR // {st.session_state.username.upper()}</div>
+                <div class="term-title">ALPHASTAKE</div>
+                <div class="term-meta">OPERATOR // {html.escape(st.session_state.username.upper())}</div>
             </div>
-            <div>
-                <span class="status-chip {chip_cls}"><span class="dot-live"></span>{chip_txt}</span>
-            </div>
+            <div><span class="status-tag {tag_cls}">{tag_txt}</span></div>
         </div>
-        <div class="telemetry-strip">
-            <div class="tele-card">
-                <div class="tele-label">Market Weight</div>
-                <div class="tele-val">{multiplier:.2f}x</div>
+        <div class="stat-bar">
+            <div class="stat-cell">
+                <div class="stat-k">Market Weight</div>
+                <div class="stat-v">{multiplier:.2f}x</div>
             </div>
-            <div class="tele-card">
-                <div class="tele-label">Upcoming Fixtures</div>
-                <div class="tele-val">{len(fixtures)}</div>
+            <div class="stat-cell">
+                <div class="stat-k">Upcoming Fixtures</div>
+                <div class="stat-v">{len(fixtures)}</div>
             </div>
-            <div class="tele-card">
-                <div class="tele-label">Active Leagues</div>
-                <div class="tele-val">{len(active_leagues)} / 16</div>
+            <div class="stat-cell">
+                <div class="stat-k">Active Leagues</div>
+                <div class="stat-v">{len(active_leagues)} / 16</div>
             </div>
-            <div class="tele-card">
-                <div class="tele-label">Neural Penalties</div>
-                <div class="tele-val">{penalties}</div>
+            <div class="stat-cell">
+                <div class="stat-k">Neural Penalties</div>
+                <div class="stat-v">{penalties}</div>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    left_col, right_col = st.columns([1.05, 1.25], gap="large")
-
     # --------------------------------------------------------------------------
-    # LEFT: SLIP GENERATOR & P&L
+    # 01 // SLIP GENERATOR
     # --------------------------------------------------------------------------
-    with left_col:
-        st.markdown('<div class="panel-card"><div class="panel-title">Terminal Slip Generator</div>', unsafe_allow_html=True)
-        c1, c2 = st.columns(2)
-        with c1:
-            target_odds = st.number_input(
-                "Target Total Odds",
-                min_value=1.20,
-                max_value=100.0,
-                value=3.50,
-                step=0.25,
-            )
-        with c2:
-            stake_amount = st.number_input(
-                "Stake Amount (UGX)",
-                min_value=500,
-                max_value=50_000_000,
-                value=5000,
-                step=500,
-            )
-
-        if st.button("Generate Smart Terminal Slip", type="primary", use_container_width=True):
-            legs, total_odds = build_smart_slip(
-                fixtures=fixtures,
-                target_odds=float(target_odds),
-                market_multiplier=multiplier,
-            )
-            if not legs:
-                st.warning("No upcoming fixtures in this window. Try 7-Day Schedule or Refresh Feed Cache.")
-            else:
-                st.session_state.current_slip = legs
-                next_num = len(st.session_state.tickets) + 1
-                est_payout = int(round(stake_amount * total_odds))
-                new_ticket = {
-                    "ticket_no": next_num,
-                    "odds": total_odds,
-                    "stake": int(stake_amount),
-                    "est_payout": est_payout,
-                    "status": "Pending",
-                    "created_at": datetime.now(timezone.utc).isoformat(),
-                    "legs": legs,
-                }
-                save_ticket_to_db(sb, st.session_state.username, new_ticket)
-                if sb:
-                    st.session_state.tickets = load_user_tickets(sb, st.session_state.username)
-                st.rerun()
-        st.markdown("</div>", unsafe_allow_html=True)
-
-        # Session P&L
-        tickets = st.session_state.tickets
-        total_staked = sum(int(t.get("stake", 0)) for t in tickets)
-        settled = [t for t in tickets if t.get("status") in {"Won", "Lost"}]
-        won_tickets = [t for t in settled if t.get("status") == "Won"]
-
-        net_pnl = 0
-        for t in settled:
-            st_val = int(t.get("stake", 0))
-            if t.get("status") == "Won":
-                net_pnl += int(t.get("est_payout", round(st_val * float(t.get("odds", 1.0))))) - st_val
-            else:
-                net_pnl -= st_val
-
-        roi_pct = (net_pnl / total_staked * 100.0) if total_staked > 0 else 0.0
-        win_rate = (len(won_tickets) / len(settled) * 100.0) if settled else 0.0
-        pnl_cls = "pos" if net_pnl > 0 else ("neg" if net_pnl < 0 else "")
-
-        st.markdown(
-            f"""
-            <div class="panel-card">
-                <div class="panel-title">Session P&amp;L Telemetry</div>
-                <div class="kpi-grid">
-                    <div class="kpi-card">
-                        <div class="kpi-title">Net P&amp;L</div>
-                        <div class="kpi-num {pnl_cls}">{net_pnl:+,}</div>
-                        <div class="kpi-sub">UGX · {roi_pct:+.1f}% ROI</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-title">Total Staked</div>
-                        <div class="kpi-num">{total_staked:,}</div>
-                        <div class="kpi-sub">UGX · {len(tickets)} SLIPS</div>
-                    </div>
-                    <div class="kpi-card">
-                        <div class="kpi-title">Win Rate</div>
-                        <div class="kpi-num">{win_rate:.1f}%</div>
-                        <div class="kpi-sub">{len(won_tickets)}/{len(settled)} SETTLED</div>
-                    </div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
+    st.markdown('<div class="sec-head">01 // SLIP GENERATOR</div>', unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1, 1, 1.1])
+    with c1:
+        target_odds = st.number_input(
+            "Target Total Odds",
+            min_value=1.20,
+            max_value=100.0,
+            value=3.50,
+            step=0.25,
         )
+    with c2:
+        stake_amount = st.number_input(
+            "Stake Amount (UGX)",
+            min_value=500,
+            max_value=50_000_000,
+            value=5000,
+            step=500,
+        )
+    with c3:
+        st.markdown("<div style='height:1.72rem;'></div>", unsafe_allow_html=True)
+        generate_clicked = st.button("Generate Smart Slip", type="primary", use_container_width=True)
 
-    # --------------------------------------------------------------------------
-    # RIGHT: ACTIVE ACCUMULATOR SLIP (UPCOMING ONLY)
-    # --------------------------------------------------------------------------
-    with right_col:
-        st.markdown('<div class="panel-card"><div class="panel-title">Accumulator Slip · Upcoming Only</div>', unsafe_allow_html=True)
-        upcoming_slip_legs = [
-            leg for leg in (st.session_state.get("current_slip") or []) if is_upcoming_fixture(leg)
-        ]
-
-        if upcoming_slip_legs:
-            slip_odds = 1.0
-            for idx, leg in enumerate(upcoming_slip_legs, start=1):
-                leg_match = get_leg_match(leg)
-                leg_league = get_leg_league(leg)
-                leg_kickoff = get_leg_kickoff(leg)
-                leg_market = get_leg_market(leg)
-                leg_odds = get_leg_odds(leg)
-                slip_odds = round(slip_odds * leg_odds, 2)
-
-                st.markdown(
-                    f"""
-                    <div class="slip-leg">
-                        <div>
-                            <div class="leg-match">{idx:02d}. {leg_match}</div>
-                            <div class="leg-meta">{leg_league} · {leg_kickoff}</div>
-                        </div>
-                        <div class="leg-right">
-                            <div class="leg-mkt">{leg_market}</div>
-                            <div class="leg-odds">@{leg_odds:.2f}</div>
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True,
-                )
-
-            est_return = int(round(stake_amount * slip_odds))
-            st.markdown(
-                f"""
-                <div class="slip-footer">
-                    <span>{len(upcoming_slip_legs)} LEGS · {slip_odds:.2f}x</span>
-                    <span>EST. PAYOUT: {est_return:,} UGX</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    if generate_clicked:
+        legs, total_odds = build_smart_slip(
+            fixtures=fixtures,
+            target_odds=float(target_odds),
+            market_multiplier=multiplier,
+        )
+        if not legs:
+            st.warning("No upcoming fixtures in this window. Try 7-Day Schedule or Refresh Feed Cache.")
         else:
-            st.caption("No active upcoming slip staged. Generate a slip on the left to inspect legs.")
-        st.markdown("</div>", unsafe_allow_html=True)
+            st.session_state.current_slip = legs
+            next_num = len(st.session_state.tickets) + 1
+            est_payout = int(round(stake_amount * total_odds))
+            new_ticket = {
+                "ticket_no": next_num,
+                "odds": total_odds,
+                "stake": int(stake_amount),
+                "est_payout": est_payout,
+                "status": "Pending",
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "legs": legs,
+            }
+            save_ticket_to_db(sb, st.session_state.username, new_ticket)
+            if sb:
+                st.session_state.tickets = load_user_tickets(sb, st.session_state.username)
+            st.rerun()
 
     # --------------------------------------------------------------------------
-    # BOTTOM: HISTORY & WEIGHT TRAINING
+    # 02 // ACTIVE ACCUMULATOR SLIP (COMPACT TABLE ROWS)
     # --------------------------------------------------------------------------
-    st.markdown('<div class="panel-card"><div class="panel-title">Terminal History &amp; Weight Training</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sec-head">02 // ACTIVE ACCUMULATOR SLIP · UPCOMING ONLY</div>', unsafe_allow_html=True)
+    upcoming_slip_legs = [
+        leg for leg in (st.session_state.get("current_slip") or []) if is_upcoming_fixture(leg)
+    ]
+
+    if upcoming_slip_legs:
+        slip_odds = 1.0
+        rows_html: list[str] = []
+        for idx, leg in enumerate(upcoming_slip_legs, start=1):
+            leg_match = html.escape(get_leg_match(leg))
+            leg_league = html.escape(get_leg_league(leg))
+            leg_kickoff = html.escape(get_leg_kickoff(leg))
+            leg_market = html.escape(get_leg_market(leg))
+            leg_odds = get_leg_odds(leg)
+            slip_odds = round(slip_odds * leg_odds, 2)
+            rows_html.append(
+                f"<tr>"
+                f"<td class='mono td-muted'>{idx:02d}</td>"
+                f"<td><strong>{leg_match}</strong></td>"
+                f"<td class='td-muted'>{leg_league}</td>"
+                f"<td class='mono td-muted'>{leg_kickoff}</td>"
+                f"<td>{leg_market}</td>"
+                f"<td class='num td-odds'>{leg_odds:.2f}</td>"
+                f"</tr>"
+            )
+
+        est_return = int(round(stake_amount * slip_odds))
+        table_html = (
+            "<table class='term-table'>"
+            "<thead><tr>"
+            "<th>#</th><th>Fixture</th><th>Competition</th><th>Kickoff</th><th>Selection</th><th class='num'>Odds</th>"
+            "</tr></thead>"
+            f"<tbody>{''.join(rows_html)}</tbody>"
+            "</table>"
+            f"<div class='term-summary-row'>"
+            f"<span>{len(upcoming_slip_legs)} LEGS · COMBINED {slip_odds:.2f}x</span>"
+            f"<span>EST. PAYOUT: {est_return:,} UGX</span>"
+            f"</div>"
+        )
+        st.markdown(table_html, unsafe_allow_html=True)
+    else:
+        st.caption("No active slip staged. Click Generate Smart Slip above.")
+
+    # --------------------------------------------------------------------------
+    # 03 // SESSION P&L TELEMETRY
+    # --------------------------------------------------------------------------
+    st.markdown('<div class="sec-head">03 // SESSION P&amp;L TELEMETRY</div>', unsafe_allow_html=True)
+    tickets = st.session_state.tickets
+    total_staked = sum(int(t.get("stake", 0)) for t in tickets)
+    settled = [t for t in tickets if t.get("status") in {"Won", "Lost"}]
+    won_tickets = [t for t in settled if t.get("status") == "Won"]
+
+    net_pnl = 0
+    for t in settled:
+        st_val = int(t.get("stake", 0))
+        if t.get("status") == "Won":
+            net_pnl += int(t.get("est_payout", round(st_val * float(t.get("odds", 1.0))))) - st_val
+        else:
+            net_pnl -= st_val
+
+    roi_pct = (net_pnl / total_staked * 100.0) if total_staked > 0 else 0.0
+    win_rate = (len(won_tickets) / len(settled) * 100.0) if settled else 0.0
+    pnl_cls = "pos" if net_pnl > 0 else ("neg" if net_pnl < 0 else "")
+
+    st.markdown(
+        f"""
+        <div class="pnl-bar">
+            <div class="pnl-cell">
+                <div class="stat-k">Net P&amp;L ({roi_pct:+.1f}% ROI)</div>
+                <div class="stat-v {pnl_cls}">{net_pnl:+,} UGX</div>
+            </div>
+            <div class="pnl-cell">
+                <div class="stat-k">Total Staked ({len(tickets)} Slips)</div>
+                <div class="stat-v">{total_staked:,} UGX</div>
+            </div>
+            <div class="pnl-cell">
+                <div class="stat-k">Win Rate ({len(won_tickets)}/{len(settled)} Settled)</div>
+                <div class="stat-v">{win_rate:.1f}%</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------------------------
+    # 04 // TERMINAL HISTORY & WEIGHT TRAINING
+    # --------------------------------------------------------------------------
+    st.markdown('<div class="sec-head">04 // TERMINAL HISTORY &amp; WEIGHT TRAINING</div>', unsafe_allow_html=True)
 
     if tickets:
         if st.button("Clear History Log"):
@@ -967,7 +941,10 @@ def render_terminal(sb: Client | None) -> None:
             t_payout = int(ticket.get("est_payout", round(t_stake * t_odds)))
             t_legs = ticket.get("legs") or []
 
-            with st.expander(f"SLIP #{t_num:02d}  |  {t_odds:.2f}x  |  {t_stake:,} -> {t_payout:,} UGX  |  [{t_status}]", expanded=(idx == 0)):
+            with st.expander(
+                f"SLIP #{t_num:02d}  |  {t_odds:.2f}x  |  {t_stake:,} -> {t_payout:,} UGX  |  [{t_status}]",
+                expanded=(idx == 0),
+            ):
                 b1, b2, b3 = st.columns(3)
                 with b1:
                     if st.button("Mark Won", key=f"won_{t_num}_{idx}", use_container_width=True):
@@ -992,15 +969,26 @@ def render_terminal(sb: Client | None) -> None:
                         update_ticket_status_in_db(sb, st.session_state.username, ticket, "Pending")
                         st.rerun()
 
+                hist_rows: list[str] = []
                 for l_idx, leg in enumerate(t_legs, start=1):
-                    st.markdown(
-                        f"`{l_idx:02d}` **{get_leg_match(leg)}** — {get_leg_market(leg)} "
-                        f"@ `{get_leg_odds(leg):.2f}` *({get_leg_league(leg)})*"
+                    hist_rows.append(
+                        f"<tr>"
+                        f"<td class='mono td-muted'>{l_idx:02d}</td>"
+                        f"<td>{html.escape(get_leg_match(leg))}</td>"
+                        f"<td class='td-muted'>{html.escape(get_leg_league(leg))}</td>"
+                        f"<td>{html.escape(get_leg_market(leg))}</td>"
+                        f"<td class='num td-odds'>{get_leg_odds(leg):.2f}</td>"
+                        f"</tr>"
                     )
+                st.markdown(
+                    "<table class='term-table'>"
+                    "<thead><tr><th>#</th><th>Fixture</th><th>Competition</th><th>Selection</th><th class='num'>Odds</th></tr></thead>"
+                    f"<tbody>{''.join(hist_rows)}</tbody>"
+                    "</table>",
+                    unsafe_allow_html=True,
+                )
     else:
         st.caption("No logged tickets yet.")
-
-    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ==============================================================================
