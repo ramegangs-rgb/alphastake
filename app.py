@@ -1,18 +1,18 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
-import html
 import random
 from typing import Any
 
+import pandas as pd
 import requests
 import streamlit as st
 from supabase import Client, create_client
 
 # ==============================================================================
-# PAGE CONFIG & EXCLUSIVE 16 LEAGUES
+# PAGE CONFIG & EXCLUSIVE 16 LEAGUES (BRAZILIAN SERIE A REMOVED)
 # ==============================================================================
 st.set_page_config(
-    page_title="ALPHASTAKE // TERMINAL",
+    page_title="AlphaStake",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -121,214 +121,17 @@ def is_upcoming_fixture(item: Any) -> bool:
 
 
 # ==============================================================================
-# ULTRA-MINIMAL FLAT BLACK TERMINAL THEME
+# SUBTLE NATIVE POLISH
 # ==============================================================================
 st.markdown(
     """
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
-        html, body, [class*="css"] {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background-color: #050505;
-            color: #e4e4e7;
-        }
-        code, pre, .mono {
-            font-family: 'JetBrains Mono', monospace !important;
-            font-variant-numeric: tabular-nums;
-        }
-        .stApp {
-            background-color: #050505;
-            color: #e4e4e7;
-        }
-        .block-container {
-            padding-top: 1.75rem;
-            padding-bottom: 3rem;
-            max-width: 1080px;
-        }
-        section[data-testid="stSidebar"] {
-            background-color: #09090b;
-            border-right: 1px solid #1f1f23;
-        }
-        .term-topbar {
-            display: flex;
-            flex-wrap: wrap;
-            align-items: center;
-            justify-content: space-between;
-            gap: 0.75rem;
-            padding-bottom: 0.85rem;
-            border-bottom: 1px solid #27272a;
-            margin-bottom: 1rem;
-        }
-        .term-title {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.25rem;
-            font-weight: 700;
-            letter-spacing: 0.16em;
-            color: #fafafa;
-            margin: 0;
-        }
-        .term-meta {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.74rem;
-            letter-spacing: 0.08em;
-            color: #71717a;
-            text-transform: uppercase;
-        }
-        .status-tag {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.72rem;
-            font-weight: 600;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            padding: 0.2rem 0.5rem;
-            border: 1px solid #27272a;
-            color: #10b981;
-            background: #09090b;
-        }
-        .status-tag.warn {
-            color: #f59e0b;
-        }
-        .stat-bar {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            border-top: 1px solid #1f1f23;
-            border-bottom: 1px solid #1f1f23;
-            margin-bottom: 1.5rem;
-        }
-        @media (max-width: 768px) {
-            .stat-bar { grid-template-columns: repeat(2, 1fr); }
-        }
-        .stat-cell {
-            padding: 0.65rem 0.85rem;
-            border-right: 1px solid #1f1f23;
-        }
-        .stat-cell:last-child {
-            border-right: none;
-        }
-        .stat-k {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.68rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: #71717a;
-        }
-        .stat-v {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: #fafafa;
-            margin-top: 0.15rem;
-        }
-        .sec-head {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.74rem;
-            font-weight: 600;
-            letter-spacing: 0.14em;
-            text-transform: uppercase;
-            color: #a1a1aa;
-            padding-bottom: 0.45rem;
-            border-bottom: 1px solid #27272a;
-            margin-top: 1.5rem;
-            margin-bottom: 0.85rem;
-        }
-        .term-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.84rem;
-            margin-bottom: 0.6rem;
-        }
-        .term-table th {
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.69rem;
-            font-weight: 600;
-            letter-spacing: 0.09em;
-            text-transform: uppercase;
-            color: #71717a;
-            text-align: left;
-            padding: 0.45rem 0.6rem;
-            border-bottom: 1px solid #27272a;
-        }
-        .term-table th.num, .term-table td.num {
-            text-align: right;
-            font-family: 'JetBrains Mono', monospace;
-            font-variant-numeric: tabular-nums;
-        }
-        .term-table td {
-            padding: 0.52rem 0.6rem;
-            border-bottom: 1px solid #18181b;
-            color: #e4e4e7;
-            vertical-align: middle;
-        }
-        .term-table tr:hover td {
-            background-color: #0b0b0e;
-        }
-        .td-muted {
-            color: #71717a !important;
-            font-size: 0.78rem;
-        }
-        .td-odds {
-            color: #10b981 !important;
-            font-weight: 600;
-        }
-        .term-summary-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 0.55rem 0.6rem;
-            border-top: 1px solid #27272a;
-            border-bottom: 1px solid #27272a;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.82rem;
-            color: #fafafa;
-            background-color: #09090b;
-        }
-        .pnl-bar {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            border-top: 1px solid #1f1f23;
-            border-bottom: 1px solid #1f1f23;
-        }
-        @media (max-width: 768px) {
-            .pnl-bar { grid-template-columns: 1fr; }
-        }
-        .pnl-cell {
-            padding: 0.7rem 0.85rem;
-            border-right: 1px solid #1f1f23;
-        }
-        .pnl-cell:last-child {
-            border-right: none;
-        }
-        .pos { color: #10b981 !important; }
-        .neg { color: #ef4444 !important; }
-        .stButton > button {
-            border-radius: 0px !important;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.78rem;
-            font-weight: 600;
-            letter-spacing: 0.06em;
-            text-transform: uppercase;
-            background-color: #09090b;
-            color: #e4e4e7;
-            border: 1px solid #27272a;
-        }
-        .stButton > button:hover {
-            border-color: #52525b;
-            color: #fafafa;
-        }
-        .stButton > button[kind="primary"] {
-            background-color: #10b981;
-            color: #050505;
-            border: 1px solid #10b981;
-        }
-        .stButton > button[kind="primary"]:hover {
-            background-color: #34d399;
-            border-color: #34d399;
-        }
-        div[data-testid="stExpander"] {
-            border: 1px solid #1f1f23 !important;
-            border-radius: 0px !important;
-            background-color: #070709 !important;
+        .block-container { padding-top: 1.75rem; padding-bottom: 3rem; }
+        div[data-testid="stMetric"] {
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
         }
     </style>
     """,
@@ -606,29 +409,16 @@ def build_smart_slip(
 # AUTHENTICATION SCREEN
 # ==============================================================================
 def render_auth_screen(sb: Client | None) -> None:
-    tag_cls = "" if sb else "warn"
-    tag_txt = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
+    st.title("AlphaStake")
+    st.caption("16 Leagues · Upcoming Fixtures Only")
 
-    st.markdown(
-        f"""
-        <div class="term-topbar">
-            <div>
-                <div class="term-title">ALPHASTAKE</div>
-                <div class="term-meta">QUANTITATIVE SLIP TERMINAL // 16 LEAGUES</div>
-            </div>
-            <div><span class="status-tag {tag_cls}">{tag_txt}</span></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    tab_login, tab_register = st.tabs(["SIGN IN", "REGISTER"])
+    tab_login, tab_register = st.tabs(["Sign In", "Register"])
 
     with tab_login:
         with st.form("login_form"):
-            username = st.text_input("Operator Username").strip().lower()
+            username = st.text_input("Username").strip().lower()
             password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Access Terminal", type="primary")
+            submitted = st.form_submit_button("Sign In", type="primary")
 
         if submitted:
             if not username or not password:
@@ -699,7 +489,7 @@ def render_auth_screen(sb: Client | None) -> None:
 
 
 # ==============================================================================
-# MAIN TERMINAL (SINGLE-COLUMN FLAT TABLE LAYOUT)
+# MAIN TERMINAL (CLEAN NATIVE STREAMLIT)
 # ==============================================================================
 def render_terminal(sb: Client | None) -> None:
     window_options = {
@@ -709,7 +499,7 @@ def render_terminal(sb: Client | None) -> None:
     }
 
     with st.sidebar:
-        st.markdown('<div class="sec-head" style="margin-top:0;">FEED &amp; SESSION</div>', unsafe_allow_html=True)
+        st.header("Controls")
         selected_window_label = st.selectbox(
             "Fixture Window",
             list(window_options.keys()),
@@ -737,56 +527,32 @@ def render_terminal(sb: Client | None) -> None:
             cache_bust=st.session_state.fixture_cache_bust,
         )
 
-        with st.expander(f"LEAGUE FEED ({len(active_leagues)}/16)", expanded=False):
+        with st.expander(f"League Feed Status ({len(active_leagues)}/16)", expanded=False):
             if active_leagues:
                 for lg_name, cnt in sorted(active_leagues.items(), key=lambda x: (-x[1], x[0])):
-                    st.markdown(f"`{cnt:02d}` {lg_name}")
+                    st.write(f"{lg_name}: {cnt}")
             else:
                 st.caption("No upcoming fixtures in this window.")
 
     weights = st.session_state.weights
     multiplier = float(weights.get("market_multiplier", 1.00))
     penalties = int(weights.get("penalties", 0))
-    tag_cls = "" if sb else "warn"
-    tag_txt = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
+    sync_status = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
 
-    # Top Header & Telemetry Bar
-    st.markdown(
-        f"""
-        <div class="term-topbar">
-            <div>
-                <div class="term-title">ALPHASTAKE</div>
-                <div class="term-meta">OPERATOR // {html.escape(st.session_state.username.upper())}</div>
-            </div>
-            <div><span class="status-tag {tag_cls}">{tag_txt}</span></div>
-        </div>
-        <div class="stat-bar">
-            <div class="stat-cell">
-                <div class="stat-k">Market Weight</div>
-                <div class="stat-v">{multiplier:.2f}x</div>
-            </div>
-            <div class="stat-cell">
-                <div class="stat-k">Upcoming Fixtures</div>
-                <div class="stat-v">{len(fixtures)}</div>
-            </div>
-            <div class="stat-cell">
-                <div class="stat-k">Active Leagues</div>
-                <div class="stat-v">{len(active_leagues)} / 16</div>
-            </div>
-            <div class="stat-cell">
-                <div class="stat-k">Neural Penalties</div>
-                <div class="stat-v">{penalties}</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.title("AlphaStake")
+    st.caption(f"Operator: {st.session_state.username} · {sync_status}")
 
-    # --------------------------------------------------------------------------
-    # 01 // SLIP GENERATOR
-    # --------------------------------------------------------------------------
-    st.markdown('<div class="sec-head">01 // SLIP GENERATOR</div>', unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1, 1.1])
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Market Weight", f"{multiplier:.2f}x")
+    m2.metric("Upcoming Fixtures", len(fixtures))
+    m3.metric("Active Leagues", f"{len(active_leagues)}/16")
+    m4.metric("Neural Penalties", penalties)
+
+    st.divider()
+
+    # Slip Generator
+    st.subheader("Slip Generator")
+    c1, c2 = st.columns(2)
     with c1:
         target_odds = st.number_input(
             "Target Total Odds",
@@ -803,11 +569,8 @@ def render_terminal(sb: Client | None) -> None:
             value=5000,
             step=500,
         )
-    with c3:
-        st.markdown("<div style='height:1.72rem;'></div>", unsafe_allow_html=True)
-        generate_clicked = st.button("Generate Smart Slip", type="primary", use_container_width=True)
 
-    if generate_clicked:
+    if st.button("Generate Smart Slip", type="primary"):
         legs, total_odds = build_smart_slip(
             fixtures=fixtures,
             target_odds=float(target_odds),
@@ -833,56 +596,40 @@ def render_terminal(sb: Client | None) -> None:
                 st.session_state.tickets = load_user_tickets(sb, st.session_state.username)
             st.rerun()
 
-    # --------------------------------------------------------------------------
-    # 02 // ACTIVE ACCUMULATOR SLIP (COMPACT TABLE ROWS)
-    # --------------------------------------------------------------------------
-    st.markdown('<div class="sec-head">02 // ACTIVE ACCUMULATOR SLIP · UPCOMING ONLY</div>', unsafe_allow_html=True)
+    st.divider()
+
+    # Accumulator Slip (Upcoming Fixtures Only)
+    st.subheader("Accumulator Slip")
     upcoming_slip_legs = [
         leg for leg in (st.session_state.get("current_slip") or []) if is_upcoming_fixture(leg)
     ]
 
     if upcoming_slip_legs:
         slip_odds = 1.0
-        rows_html: list[str] = []
+        slip_rows: list[dict[str, Any]] = []
         for idx, leg in enumerate(upcoming_slip_legs, start=1):
-            leg_match = html.escape(get_leg_match(leg))
-            leg_league = html.escape(get_leg_league(leg))
-            leg_kickoff = html.escape(get_leg_kickoff(leg))
-            leg_market = html.escape(get_leg_market(leg))
             leg_odds = get_leg_odds(leg)
             slip_odds = round(slip_odds * leg_odds, 2)
-            rows_html.append(
-                f"<tr>"
-                f"<td class='mono td-muted'>{idx:02d}</td>"
-                f"<td><strong>{leg_match}</strong></td>"
-                f"<td class='td-muted'>{leg_league}</td>"
-                f"<td class='mono td-muted'>{leg_kickoff}</td>"
-                f"<td>{leg_market}</td>"
-                f"<td class='num td-odds'>{leg_odds:.2f}</td>"
-                f"</tr>"
+            slip_rows.append(
+                {
+                    "#": idx,
+                    "Match": get_leg_match(leg),
+                    "League": get_leg_league(leg),
+                    "Kickoff": get_leg_kickoff(leg),
+                    "Market": get_leg_market(leg),
+                    "Odds": round(leg_odds, 2),
+                }
             )
-
+        st.dataframe(pd.DataFrame(slip_rows), use_container_width=True, hide_index=True)
         est_return = int(round(stake_amount * slip_odds))
-        table_html = (
-            "<table class='term-table'>"
-            "<thead><tr>"
-            "<th>#</th><th>Fixture</th><th>Competition</th><th>Kickoff</th><th>Selection</th><th class='num'>Odds</th>"
-            "</tr></thead>"
-            f"<tbody>{''.join(rows_html)}</tbody>"
-            "</table>"
-            f"<div class='term-summary-row'>"
-            f"<span>{len(upcoming_slip_legs)} LEGS · COMBINED {slip_odds:.2f}x</span>"
-            f"<span>EST. PAYOUT: {est_return:,} UGX</span>"
-            f"</div>"
-        )
-        st.markdown(table_html, unsafe_allow_html=True)
+        st.write(f"**Combined Odds:** {slip_odds:.2f}x · **Est. Payout:** {est_return:,} UGX")
     else:
-        st.caption("No active slip staged. Click Generate Smart Slip above.")
+        st.caption("No active upcoming slip generated yet.")
 
-    # --------------------------------------------------------------------------
-    # 03 // SESSION P&L TELEMETRY
-    # --------------------------------------------------------------------------
-    st.markdown('<div class="sec-head">03 // SESSION P&amp;L TELEMETRY</div>', unsafe_allow_html=True)
+    st.divider()
+
+    # Session P&L
+    st.subheader("Session P&L")
     tickets = st.session_state.tickets
     total_staked = sum(int(t.get("stake", 0)) for t in tickets)
     settled = [t for t in tickets if t.get("status") in {"Won", "Lost"}]
@@ -898,33 +645,16 @@ def render_terminal(sb: Client | None) -> None:
 
     roi_pct = (net_pnl / total_staked * 100.0) if total_staked > 0 else 0.0
     win_rate = (len(won_tickets) / len(settled) * 100.0) if settled else 0.0
-    pnl_cls = "pos" if net_pnl > 0 else ("neg" if net_pnl < 0 else "")
 
-    st.markdown(
-        f"""
-        <div class="pnl-bar">
-            <div class="pnl-cell">
-                <div class="stat-k">Net P&amp;L ({roi_pct:+.1f}% ROI)</div>
-                <div class="stat-v {pnl_cls}">{net_pnl:+,} UGX</div>
-            </div>
-            <div class="pnl-cell">
-                <div class="stat-k">Total Staked ({len(tickets)} Slips)</div>
-                <div class="stat-v">{total_staked:,} UGX</div>
-            </div>
-            <div class="pnl-cell">
-                <div class="stat-k">Win Rate ({len(won_tickets)}/{len(settled)} Settled)</div>
-                <div class="stat-v">{win_rate:.1f}%</div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    p1, p2, p3 = st.columns(3)
+    p1.metric("Net P&L", f"{net_pnl:+,} UGX", f"{roi_pct:+.1f}% ROI")
+    p2.metric("Total Staked", f"{total_staked:,} UGX", f"{len(tickets)} tickets")
+    p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len(won_tickets)}/{len(settled)} settled")
 
-    # --------------------------------------------------------------------------
-    # 04 // TERMINAL HISTORY & WEIGHT TRAINING
-    # --------------------------------------------------------------------------
-    st.markdown('<div class="sec-head">04 // TERMINAL HISTORY &amp; WEIGHT TRAINING</div>', unsafe_allow_html=True)
+    st.divider()
 
+    # History & Training
+    st.subheader("History & Training")
     if tickets:
         if st.button("Clear History Log"):
             if sb:
@@ -936,13 +666,13 @@ def render_terminal(sb: Client | None) -> None:
         for idx, ticket in enumerate(reversed(tickets)):
             t_num = ticket.get("ticket_no", len(tickets) - idx)
             t_odds = float(ticket.get("odds", 1.0))
-            t_status = str(ticket.get("status", "Pending")).upper()
+            t_status = ticket.get("status", "Pending")
             t_stake = int(ticket.get("stake", 5000))
             t_payout = int(ticket.get("est_payout", round(t_stake * t_odds)))
             t_legs = ticket.get("legs") or []
 
             with st.expander(
-                f"SLIP #{t_num:02d}  |  {t_odds:.2f}x  |  {t_stake:,} -> {t_payout:,} UGX  |  [{t_status}]",
+                f"Ticket #{t_num} | {t_odds:.2f}x | {t_stake:,} -> {t_payout:,} UGX | [{t_status}]",
                 expanded=(idx == 0),
             ):
                 b1, b2, b3 = st.columns(3)
@@ -969,24 +699,11 @@ def render_terminal(sb: Client | None) -> None:
                         update_ticket_status_in_db(sb, st.session_state.username, ticket, "Pending")
                         st.rerun()
 
-                hist_rows: list[str] = []
                 for l_idx, leg in enumerate(t_legs, start=1):
-                    hist_rows.append(
-                        f"<tr>"
-                        f"<td class='mono td-muted'>{l_idx:02d}</td>"
-                        f"<td>{html.escape(get_leg_match(leg))}</td>"
-                        f"<td class='td-muted'>{html.escape(get_leg_league(leg))}</td>"
-                        f"<td>{html.escape(get_leg_market(leg))}</td>"
-                        f"<td class='num td-odds'>{get_leg_odds(leg):.2f}</td>"
-                        f"</tr>"
+                    st.write(
+                        f"{l_idx}. **{get_leg_match(leg)}** ({get_leg_league(leg)}) — "
+                        f"{get_leg_market(leg)} @ {get_leg_odds(leg):.2f}"
                     )
-                st.markdown(
-                    "<table class='term-table'>"
-                    "<thead><tr><th>#</th><th>Fixture</th><th>Competition</th><th>Selection</th><th class='num'>Odds</th></tr></thead>"
-                    f"<tbody>{''.join(hist_rows)}</tbody>"
-                    "</table>",
-                    unsafe_allow_html=True,
-                )
     else:
         st.caption("No logged tickets yet.")
 
