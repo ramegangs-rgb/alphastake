@@ -3,13 +3,12 @@ import hashlib
 import random
 from typing import Any
 
-import pandas as pd
 import requests
 import streamlit as st
 from supabase import Client, create_client
 
 # ==============================================================================
-# PAGE CONFIG & EXCLUSIVE 16 LEAGUES (BRAZILIAN SERIE A REMOVED)
+# PAGE CONFIG & EXCLUSIVE 16 LEAGUES
 # ==============================================================================
 st.set_page_config(
     page_title="AlphaStake",
@@ -121,17 +120,15 @@ def is_upcoming_fixture(item: Any) -> bool:
 
 
 # ==============================================================================
-# SUBTLE NATIVE POLISH
+# MINIMAL SPACING OVERRIDE (THEME HANDLED BY .streamlit/config.toml)
 # ==============================================================================
 st.markdown(
     """
     <style>
-        .block-container { padding-top: 1.75rem; padding-bottom: 3rem; }
-        div[data-testid="stMetric"] {
-            background-color: rgba(255, 255, 255, 0.02);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 8px;
-            padding: 0.75rem 1rem;
+        .block-container {
+            padding-top: 1.75rem;
+            padding-bottom: 3rem;
+            max-width: 1120px;
         }
     </style>
     """,
@@ -410,86 +407,90 @@ def build_smart_slip(
 # ==============================================================================
 def render_auth_screen(sb: Client | None) -> None:
     st.title("AlphaStake")
-    st.caption("16 Leagues · Upcoming Fixtures Only")
+    sync_label = "Supabase Synced" if sb else "Local Session"
+    st.caption(f"16 Leagues · Upcoming Fixtures Only · {sync_label}")
 
-    tab_login, tab_register = st.tabs(["Sign In", "Register"])
+    _, center, _ = st.columns([1, 1.4, 1])
+    with center:
+        with st.container(border=True):
+            tab_login, tab_register = st.tabs(["Sign In", "Register"])
 
-    with tab_login:
-        with st.form("login_form"):
-            username = st.text_input("Username").strip().lower()
-            password = st.text_input("Password", type="password")
-            submitted = st.form_submit_button("Sign In", type="primary")
+            with tab_login:
+                with st.form("login_form", border=False):
+                    username = st.text_input("Username").strip().lower()
+                    password = st.text_input("Password", type="password")
+                    submitted = st.form_submit_button("Sign In", type="primary", use_container_width=True)
 
-        if submitted:
-            if not username or not password:
-                st.error("Enter both username and password.")
-            else:
-                pw_hash = hash_password(password)
-                if sb:
-                    user_row = fetch_user_record(sb, username)
-                    if not user_row:
-                        st.error("Account not found. Switch to Register.")
+                if submitted:
+                    if not username or not password:
+                        st.error("Enter both username and password.")
                     else:
-                        stored_pw = user_row.get("password", "")
-                        if pw_hash != stored_pw and password != stored_pw:
-                            st.error("Invalid password.")
+                        pw_hash = hash_password(password)
+                        if sb:
+                            user_row = fetch_user_record(sb, username)
+                            if not user_row:
+                                st.error("Account not found. Switch to Register.")
+                            else:
+                                stored_pw = user_row.get("password", "")
+                                if pw_hash != stored_pw and password != stored_pw:
+                                    st.error("Invalid password.")
+                                else:
+                                    st.session_state.authenticated = True
+                                    st.session_state.username = username
+                                    st.session_state.weights = user_row.get("weights") or {
+                                        "market_multiplier": 1.00,
+                                        "penalties": 0,
+                                    }
+                                    st.session_state.tickets = load_user_tickets(sb, username)
+                                    st.session_state.current_slip = []
+                                    st.rerun()
                         else:
                             st.session_state.authenticated = True
                             st.session_state.username = username
-                            st.session_state.weights = user_row.get("weights") or {
-                                "market_multiplier": 1.00,
-                                "penalties": 0,
-                            }
-                            st.session_state.tickets = load_user_tickets(sb, username)
-                            st.session_state.current_slip = []
                             st.rerun()
-                else:
-                    st.session_state.authenticated = True
-                    st.session_state.username = username
-                    st.rerun()
 
-    with tab_register:
-        with st.form("register_form"):
-            new_user = st.text_input("Choose Username").strip().lower()
-            new_pw = st.text_input("Choose Password", type="password")
-            confirm_pw = st.text_input("Confirm Password", type="password")
-            reg_submitted = st.form_submit_button("Create Account", type="primary")
+            with tab_register:
+                with st.form("register_form", border=False):
+                    new_user = st.text_input("Choose Username").strip().lower()
+                    new_pw = st.text_input("Choose Password", type="password")
+                    confirm_pw = st.text_input("Confirm Password", type="password")
+                    reg_submitted = st.form_submit_button("Create Account", type="primary", use_container_width=True)
 
-        if reg_submitted:
-            if not new_user or not new_pw:
-                st.error("Username and password are required.")
-            elif new_pw != confirm_pw:
-                st.error("Passwords do not match.")
-            else:
-                default_weights = {"market_multiplier": 1.00, "penalties": 0}
-                pw_hash = hash_password(new_pw)
-                if sb:
-                    if fetch_user_record(sb, new_user):
-                        st.error("Username already exists. Sign in instead.")
+                if reg_submitted:
+                    if not new_user or not new_pw:
+                        st.error("Username and password are required.")
+                    elif new_pw != confirm_pw:
+                        st.error("Passwords do not match.")
                     else:
-                        sb.table("users").insert(
-                            {
-                                "username": new_user,
-                                "password": pw_hash,
-                                "weights": default_weights,
-                            }
-                        ).execute()
-                        st.session_state.authenticated = True
-                        st.session_state.username = new_user
-                        st.session_state.weights = default_weights
-                        st.session_state.tickets = []
-                        st.session_state.current_slip = []
-                        st.rerun()
-                else:
-                    st.session_state.authenticated = True
-                    st.session_state.username = new_user
-                    st.session_state.weights = default_weights
-                    st.session_state.tickets = []
-                    st.rerun()
+                        default_weights = {"market_multiplier": 1.00, "penalties": 0}
+                        pw_hash = hash_password(new_pw)
+                        if sb:
+                            if fetch_user_record(sb, new_user):
+                                st.error("Username already exists. Sign in instead.")
+                            else:
+                                sb.table("users").insert(
+                                    {
+                                        "username": new_user,
+                                        "password": pw_hash,
+                                        "weights": default_weights,
+                                    }
+                                ).execute()
+                                st.session_state.authenticated = True
+                                st.session_state.username = new_user
+                                st.session_state.weights = default_weights
+                                st.session_state.tickets = []
+                                st.session_state.current_slip = []
+                                st.rerun()
+                        else:
+                            st.session_state.authenticated = True
+                            st.session_state.username = new_user
+                            st.session_state.weights = default_weights
+                            st.session_state.tickets = []
+                            st.rerun()
 
 
 # ==============================================================================
-# MAIN TERMINAL (CLEAN NATIVE STREAMLIT)
+# MAIN TERMINAL (NATIVE BORDERED CARDS + CLEAN TABS)
 # ==============================================================================
 def render_terminal(sb: Client | None) -> None:
     window_options = {
@@ -499,7 +500,7 @@ def render_terminal(sb: Client | None) -> None:
     }
 
     with st.sidebar:
-        st.header("Controls")
+        st.subheader("Feed & Session")
         selected_window_label = st.selectbox(
             "Fixture Window",
             list(window_options.keys()),
@@ -527,10 +528,11 @@ def render_terminal(sb: Client | None) -> None:
             cache_bust=st.session_state.fixture_cache_bust,
         )
 
+        st.divider()
         with st.expander(f"League Feed Status ({len(active_leagues)}/16)", expanded=False):
             if active_leagues:
                 for lg_name, cnt in sorted(active_leagues.items(), key=lambda x: (-x[1], x[0])):
-                    st.write(f"{lg_name}: {cnt}")
+                    st.write(f"`{cnt:02d}` · {lg_name}")
             else:
                 st.caption("No upcoming fixtures in this window.")
 
@@ -543,169 +545,204 @@ def render_terminal(sb: Client | None) -> None:
     st.caption(f"Operator: {st.session_state.username} · {sync_status}")
 
     m1, m2, m3, m4 = st.columns(4)
-    m1.metric("Market Weight", f"{multiplier:.2f}x")
-    m2.metric("Upcoming Fixtures", len(fixtures))
-    m3.metric("Active Leagues", f"{len(active_leagues)}/16")
-    m4.metric("Neural Penalties", penalties)
+    with m1:
+        with st.container(border=True):
+            st.metric("Market Weight", f"{multiplier:.2f}x")
+    with m2:
+        with st.container(border=True):
+            st.metric("Upcoming Fixtures", len(fixtures))
+    with m3:
+        with st.container(border=True):
+            st.metric("Active Leagues", f"{len(active_leagues)} / 16")
+    with m4:
+        with st.container(border=True):
+            st.metric("Neural Penalties", penalties)
 
-    st.divider()
+    tab_slip, tab_history, tab_pnl = st.tabs(
+        ["Slip Terminal", "History & Training", "P&L Analytics"]
+    )
 
-    # Slip Generator
-    st.subheader("Slip Generator")
-    c1, c2 = st.columns(2)
-    with c1:
-        target_odds = st.number_input(
-            "Target Total Odds",
-            min_value=1.20,
-            max_value=100.0,
-            value=3.50,
-            step=0.25,
-        )
-    with c2:
-        stake_amount = st.number_input(
-            "Stake Amount (UGX)",
-            min_value=500,
-            max_value=50_000_000,
-            value=5000,
-            step=500,
-        )
-
-    if st.button("Generate Smart Slip", type="primary"):
-        legs, total_odds = build_smart_slip(
-            fixtures=fixtures,
-            target_odds=float(target_odds),
-            market_multiplier=multiplier,
-        )
-        if not legs:
-            st.warning("No upcoming fixtures in this window. Try 7-Day Schedule or Refresh Feed Cache.")
-        else:
-            st.session_state.current_slip = legs
-            next_num = len(st.session_state.tickets) + 1
-            est_payout = int(round(stake_amount * total_odds))
-            new_ticket = {
-                "ticket_no": next_num,
-                "odds": total_odds,
-                "stake": int(stake_amount),
-                "est_payout": est_payout,
-                "status": "Pending",
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "legs": legs,
-            }
-            save_ticket_to_db(sb, st.session_state.username, new_ticket)
-            if sb:
-                st.session_state.tickets = load_user_tickets(sb, st.session_state.username)
-            st.rerun()
-
-    st.divider()
-
-    # Accumulator Slip (Upcoming Fixtures Only)
-    st.subheader("Accumulator Slip")
-    upcoming_slip_legs = [
-        leg for leg in (st.session_state.get("current_slip") or []) if is_upcoming_fixture(leg)
-    ]
-
-    if upcoming_slip_legs:
-        slip_odds = 1.0
-        slip_rows: list[dict[str, Any]] = []
-        for idx, leg in enumerate(upcoming_slip_legs, start=1):
-            leg_odds = get_leg_odds(leg)
-            slip_odds = round(slip_odds * leg_odds, 2)
-            slip_rows.append(
-                {
-                    "#": idx,
-                    "Match": get_leg_match(leg),
-                    "League": get_leg_league(leg),
-                    "Kickoff": get_leg_kickoff(leg),
-                    "Market": get_leg_market(leg),
-                    "Odds": round(leg_odds, 2),
-                }
-            )
-        st.dataframe(pd.DataFrame(slip_rows), use_container_width=True, hide_index=True)
-        est_return = int(round(stake_amount * slip_odds))
-        st.write(f"**Combined Odds:** {slip_odds:.2f}x · **Est. Payout:** {est_return:,} UGX")
-    else:
-        st.caption("No active upcoming slip generated yet.")
-
-    st.divider()
-
-    # Session P&L
-    st.subheader("Session P&L")
     tickets = st.session_state.tickets
-    total_staked = sum(int(t.get("stake", 0)) for t in tickets)
-    settled = [t for t in tickets if t.get("status") in {"Won", "Lost"}]
-    won_tickets = [t for t in settled if t.get("status") == "Won"]
 
-    net_pnl = 0
-    for t in settled:
-        st_val = int(t.get("stake", 0))
-        if t.get("status") == "Won":
-            net_pnl += int(t.get("est_payout", round(st_val * float(t.get("odds", 1.0))))) - st_val
+    # --------------------------------------------------------------------------
+    # TAB 1: SLIP GENERATOR & ACTIVE ACCUMULATOR SLIP
+    # --------------------------------------------------------------------------
+    with tab_slip:
+        with st.container(border=True):
+            st.subheader("Slip Generator")
+            c1, c2, c3 = st.columns([1, 1, 1.1], vertical_alignment="bottom")
+            with c1:
+                target_odds = st.number_input(
+                    "Target Total Odds",
+                    min_value=1.20,
+                    max_value=100.0,
+                    value=3.50,
+                    step=0.25,
+                )
+            with c2:
+                stake_amount = st.number_input(
+                    "Stake Amount (UGX)",
+                    min_value=500,
+                    max_value=50_000_000,
+                    value=5000,
+                    step=500,
+                )
+            with c3:
+                generate_clicked = st.button(
+                    "Generate Smart Slip",
+                    type="primary",
+                    use_container_width=True,
+                )
+
+            if generate_clicked:
+                legs, total_odds = build_smart_slip(
+                    fixtures=fixtures,
+                    target_odds=float(target_odds),
+                    market_multiplier=multiplier,
+                )
+                if not legs:
+                    st.warning("No upcoming fixtures in this window. Try 7-Day Schedule or Refresh Feed Cache.")
+                else:
+                    st.session_state.current_slip = legs
+                    next_num = len(st.session_state.tickets) + 1
+                    est_payout = int(round(stake_amount * total_odds))
+                    new_ticket = {
+                        "ticket_no": next_num,
+                        "odds": total_odds,
+                        "stake": int(stake_amount),
+                        "est_payout": est_payout,
+                        "status": "Pending",
+                        "created_at": datetime.now(timezone.utc).isoformat(),
+                        "legs": legs,
+                    }
+                    save_ticket_to_db(sb, st.session_state.username, new_ticket)
+                    if sb:
+                        st.session_state.tickets = load_user_tickets(sb, st.session_state.username)
+                    st.rerun()
+
+        st.subheader("Accumulator Slip")
+        upcoming_slip_legs = [
+            leg for leg in (st.session_state.get("current_slip") or []) if is_upcoming_fixture(leg)
+        ]
+
+        if upcoming_slip_legs:
+            slip_odds = 1.0
+            for idx, leg in enumerate(upcoming_slip_legs, start=1):
+                leg_odds = get_leg_odds(leg)
+                slip_odds = round(slip_odds * leg_odds, 2)
+                with st.container(border=True):
+                    col_left, col_right = st.columns([3, 1.2])
+                    with col_left:
+                        st.markdown(f"**{idx:02d}. {get_leg_match(leg)}**")
+                        st.caption(f"{get_leg_league(leg)} · {get_leg_kickoff(leg)}")
+                    with col_right:
+                        st.markdown(f"**{get_leg_market(leg)}**")
+                        st.caption(f"Odds: `{leg_odds:.2f}`")
+
+            est_return = int(round(stake_amount * slip_odds))
+            with st.container(border=True):
+                s1, s2, s3 = st.columns(3)
+                s1.metric("Selections", f"{len(upcoming_slip_legs)} Legs")
+                s2.metric("Combined Odds", f"{slip_odds:.2f}x")
+                s3.metric("Est. Payout", f"{est_return:,} UGX")
         else:
-            net_pnl -= st_val
+            with st.container(border=True):
+                st.caption("No active upcoming slip staged. Click Generate Smart Slip above.")
 
-    roi_pct = (net_pnl / total_staked * 100.0) if total_staked > 0 else 0.0
-    win_rate = (len(won_tickets) / len(settled) * 100.0) if settled else 0.0
+    # --------------------------------------------------------------------------
+    # TAB 2: HISTORY & WEIGHT TRAINING
+    # --------------------------------------------------------------------------
+    with tab_history:
+        if tickets:
+            h_left, h_right = st.columns([3, 1], vertical_alignment="center")
+            with h_left:
+                st.subheader(f"Ticket Log ({len(tickets)})")
+            with h_right:
+                if st.button("Clear History Log", use_container_width=True):
+                    if sb:
+                        sb.table("user_tickets").delete().eq("username", st.session_state.username).execute()
+                    st.session_state.tickets = []
+                    st.session_state.current_slip = []
+                    st.rerun()
 
-    p1, p2, p3 = st.columns(3)
-    p1.metric("Net P&L", f"{net_pnl:+,} UGX", f"{roi_pct:+.1f}% ROI")
-    p2.metric("Total Staked", f"{total_staked:,} UGX", f"{len(tickets)} tickets")
-    p3.metric("Win Rate", f"{win_rate:.1f}%", f"{len(won_tickets)}/{len(settled)} settled")
+            for idx, ticket in enumerate(reversed(tickets)):
+                t_num = ticket.get("ticket_no", len(tickets) - idx)
+                t_odds = float(ticket.get("odds", 1.0))
+                t_status = ticket.get("status", "Pending")
+                t_stake = int(ticket.get("stake", 5000))
+                t_payout = int(ticket.get("est_payout", round(t_stake * t_odds)))
+                t_legs = ticket.get("legs") or []
 
-    st.divider()
+                with st.expander(
+                    f"Ticket #{t_num:02d}  ·  {t_odds:.2f}x  ·  {t_stake:,} → {t_payout:,} UGX  ·  [{t_status}]",
+                    expanded=(idx == 0),
+                ):
+                    b1, b2, b3 = st.columns(3)
+                    with b1:
+                        if st.button("Mark Won", key=f"won_{t_num}_{idx}", use_container_width=True):
+                            updated_w = {
+                                "market_multiplier": round(min(1.30, multiplier + 0.01), 2),
+                                "penalties": penalties,
+                            }
+                            update_ticket_status_in_db(sb, st.session_state.username, ticket, "Won")
+                            update_weights_in_db(sb, st.session_state.username, updated_w)
+                            st.rerun()
+                    with b2:
+                        if st.button("Mark Lost", key=f"lost_{t_num}_{idx}", use_container_width=True):
+                            updated_w = {
+                                "market_multiplier": round(max(0.80, multiplier - 0.01), 2),
+                                "penalties": penalties + 1,
+                            }
+                            update_ticket_status_in_db(sb, st.session_state.username, ticket, "Lost")
+                            update_weights_in_db(sb, st.session_state.username, updated_w)
+                            st.rerun()
+                    with b3:
+                        if st.button("Reset Pending", key=f"pend_{t_num}_{idx}", use_container_width=True):
+                            update_ticket_status_in_db(sb, st.session_state.username, ticket, "Pending")
+                            st.rerun()
 
-    # History & Training
-    st.subheader("History & Training")
-    if tickets:
-        if st.button("Clear History Log"):
-            if sb:
-                sb.table("user_tickets").delete().eq("username", st.session_state.username).execute()
-            st.session_state.tickets = []
-            st.session_state.current_slip = []
-            st.rerun()
+                    for l_idx, leg in enumerate(t_legs, start=1):
+                        with st.container(border=True):
+                            lc1, lc2 = st.columns([3, 1.2])
+                            with lc1:
+                                st.markdown(f"**{l_idx:02d}. {get_leg_match(leg)}**")
+                                st.caption(get_leg_league(leg))
+                            with lc2:
+                                st.markdown(f"**{get_leg_market(leg)}**")
+                                st.caption(f"Odds: `{get_leg_odds(leg):.2f}`")
+        else:
+            with st.container(border=True):
+                st.caption("No logged tickets yet. Generate a slip in the Slip Terminal tab.")
 
-        for idx, ticket in enumerate(reversed(tickets)):
-            t_num = ticket.get("ticket_no", len(tickets) - idx)
-            t_odds = float(ticket.get("odds", 1.0))
-            t_status = ticket.get("status", "Pending")
-            t_stake = int(ticket.get("stake", 5000))
-            t_payout = int(ticket.get("est_payout", round(t_stake * t_odds)))
-            t_legs = ticket.get("legs") or []
+    # --------------------------------------------------------------------------
+    # TAB 3: SESSION P&L ANALYTICS
+    # --------------------------------------------------------------------------
+    with tab_pnl:
+        total_staked = sum(int(t.get("stake", 0)) for t in tickets)
+        settled = [t for t in tickets if t.get("status") in {"Won", "Lost"}]
+        won_tickets = [t for t in settled if t.get("status") == "Won"]
 
-            with st.expander(
-                f"Ticket #{t_num} | {t_odds:.2f}x | {t_stake:,} -> {t_payout:,} UGX | [{t_status}]",
-                expanded=(idx == 0),
-            ):
-                b1, b2, b3 = st.columns(3)
-                with b1:
-                    if st.button("Mark Won", key=f"won_{t_num}_{idx}", use_container_width=True):
-                        updated_w = {
-                            "market_multiplier": round(min(1.30, multiplier + 0.01), 2),
-                            "penalties": penalties,
-                        }
-                        update_ticket_status_in_db(sb, st.session_state.username, ticket, "Won")
-                        update_weights_in_db(sb, st.session_state.username, updated_w)
-                        st.rerun()
-                with b2:
-                    if st.button("Mark Lost", key=f"lost_{t_num}_{idx}", use_container_width=True):
-                        updated_w = {
-                            "market_multiplier": round(max(0.80, multiplier - 0.01), 2),
-                            "penalties": penalties + 1,
-                        }
-                        update_ticket_status_in_db(sb, st.session_state.username, ticket, "Lost")
-                        update_weights_in_db(sb, st.session_state.username, updated_w)
-                        st.rerun()
-                with b3:
-                    if st.button("Reset Pending", key=f"pend_{t_num}_{idx}", use_container_width=True):
-                        update_ticket_status_in_db(sb, st.session_state.username, ticket, "Pending")
-                        st.rerun()
+        net_pnl = 0
+        for t in settled:
+            st_val = int(t.get("stake", 0))
+            if t.get("status") == "Won":
+                net_pnl += int(t.get("est_payout", round(st_val * float(t.get("odds", 1.0))))) - st_val
+            else:
+                net_pnl -= st_val
 
-                for l_idx, leg in enumerate(t_legs, start=1):
-                    st.write(
-                        f"{l_idx}. **{get_leg_match(leg)}** ({get_leg_league(leg)}) — "
-                        f"{get_leg_market(leg)} @ {get_leg_odds(leg):.2f}"
-                    )
-    else:
-        st.caption("No logged tickets yet.")
+        roi_pct = (net_pnl / total_staked * 100.0) if total_staked > 0 else 0.0
+        win_rate = (len(won_tickets) / len(settled) * 100.0) if settled else 0.0
+
+        p1, p2, p3 = st.columns(3)
+        with p1:
+            with st.container(border=True):
+                st.metric("Net P&L", f"{net_pnl:+,} UGX", f"{roi_pct:+.1f}% ROI")
+        with p2:
+            with st.container(border=True):
+                st.metric("Total Staked", f"{total_staked:,} UGX", f"{len(tickets)} tickets")
+        with p3:
+            with st.container(border=True):
+                st.metric("Win Rate", f"{win_rate:.1f}%", f"{len(won_tickets)}/{len(settled)} settled")
 
 
 # ==============================================================================
