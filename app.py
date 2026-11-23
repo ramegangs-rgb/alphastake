@@ -245,8 +245,73 @@ def update_weights_in_db(sb: Client | None, username: str, weights: dict[str, An
 
 
 # ==============================================================================
-# ESPN FIXTURE FEED (UPCOMING MATCHES ONLY — ZERO FT MATCHES)
+# ESPN FIXTURE FEED & COMPLETED RESULTS LOOKUP
 # ==============================================================================
+def _parse_espn_event(event: dict[str, Any], league_name: str, weight: float) -> dict[str, Any] | None:
+    ev_id = str(event.get("id", ""))
+    competitions = event.get("competitions", [])
+    if not competitions:
+        return None
+    comp = competitions[0]
+    competitors = comp.get("competitors", [])
+    if len(competitors) < 2:
+        return None
+
+    home_comp = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
+    away_comp = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
+
+    home_team = (
+        home_comp.get("team", {}).get("shortDisplayName")
+        or home_comp.get("team", {}).get("displayName")
+        or "Home"
+    )
+    away_team = (
+        away_comp.get("team", {}).get("shortDisplayName")
+        or away_comp.get("team", {}).get("displayName")
+        or "Away"
+    )
+
+    try:
+        home_score = int(float(home_comp.get("score", 0) or 0))
+    except (TypeError, ValueError):
+        home_score = 0
+    try:
+        away_score = int(float(away_comp.get("score", 0) or 0))
+    except (TypeError, ValueError):
+        away_score = 0
+
+    status_obj = comp.get("status") or event.get("status") or {}
+    status_type = status_obj.get("type") or {}
+    completed = bool(status_type.get("completed", False))
+    state_str = str(status_type.get("state") or "")
+    name_str = str(status_type.get("name") or "")
+    short_detail = str(status_type.get("shortDetail") or status_type.get("detail") or "")
+
+    kickoff_str = comp.get("date") or event.get("date") or ""
+    kickoff_dt: datetime | None = None
+    if kickoff_str:
+        try:
+            kickoff_dt = datetime.fromisoformat(kickoff_str.replace("Z", "+00:00"))
+        except ValueError:
+            kickoff_dt = None
+
+    return {
+        "id": ev_id,
+        "league": league_name,
+        "weight": weight,
+        "home": home_team,
+        "away": away_team,
+        "home_score": home_score,
+        "away_score": away_score,
+        "matchup": f"{home_team} vs {away_team}",
+        "kickoff": kickoff_dt.strftime("%b %d %H:%M UTC") if kickoff_dt else "Upcoming",
+        "kickoff_dt": kickoff_dt,
+        "status": short_detail or state_str or "Scheduled",
+        "status_detail": name_str,
+        "is_completed": completed,
+    }
+
+
 @st.cache_data(ttl=600, show_spinner=False)
 def fetch_espn_fixtures(window_days: int, cache_bust: int) -> tuple[list[dict[str, Any]], dict[str, int]]:
     _ = cache_bust
@@ -277,75 +342,171 @@ def fetch_espn_fixtures(window_days: int, cache_bust: int) -> tuple[list[dict[st
                 continue
 
             for event in payload.get("events", []):
-                ev_id = str(event.get("id", ""))
-                if not ev_id or ev_id in seen_ids:
+                parsed = _parse_espn_event(event, league_name, weight)
+                if not parsed or not parsed["id"] or parsed["id"] in seen_ids:
                     continue
 
-                competitions = event.get("competitions", [])
-                if not competitions:
-                    continue
-                comp = competitions[0]
-                competitors = comp.get("competitors", [])
-                if len(competitors) < 2:
-                    continue
-
-                home_comp = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
-                away_comp = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
-
-                home_team = (
-                    home_comp.get("team", {}).get("shortDisplayName")
-                    or home_comp.get("team", {}).get("displayName")
-                    or "Home"
-                )
-                away_team = (
-                    away_comp.get("team", {}).get("shortDisplayName")
-                    or away_comp.get("team", {}).get("displayName")
-                    or "Away"
-                )
-
-                status_obj = comp.get("status") or event.get("status") or {}
-                status_type = status_obj.get("type") or {}
-                completed = bool(status_type.get("completed", False))
-                state_str = str(status_type.get("state") or "")
-                name_str = str(status_type.get("name") or "")
-                short_detail = str(status_type.get("shortDetail") or status_type.get("detail") or "")
-
-                kickoff_str = comp.get("date") or event.get("date") or ""
-                kickoff_dt: datetime | None = None
-                if kickoff_str:
-                    try:
-                        kickoff_dt = datetime.fromisoformat(kickoff_str.replace("Z", "+00:00"))
-                    except ValueError:
-                        kickoff_dt = None
-
+                kickoff_dt = parsed.get("kickoff_dt")
                 if kickoff_dt is not None:
                     if kickoff_dt <= now_utc:
                         continue
                     if kickoff_dt > cutoff_utc:
                         continue
 
-                fixture = {
-                    "id": ev_id,
-                    "league": league_name,
-                    "weight": weight,
-                    "home": home_team,
-                    "away": away_team,
-                    "matchup": f"{home_team} vs {away_team}",
-                    "kickoff": kickoff_dt.strftime("%b %d %H:%M UTC") if kickoff_dt else "Upcoming",
-                    "status": short_detail or state_str or "Scheduled",
-                    "status_detail": name_str,
-                    "is_completed": completed,
-                }
-
-                if not is_upcoming_fixture(fixture):
+                if not is_upcoming_fixture(parsed):
                     continue
 
-                seen_ids.add(ev_id)
-                all_upcoming.append(fixture)
+                seen_ids.add(parsed["id"])
+                all_upcoming.append(parsed)
                 league_counts[league_name] = league_counts.get(league_name, 0) + 1
 
     active_league_counts = {k: v for k, v in league_counts.items() if v > 0}
     return all_upcoming, active_league_counts
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def fetch_recent_finished_results(days_back: int, cache_bust: int) -> dict[str, tuple[int, int]]:
+    _ = cache_bust
+    now_utc = datetime.now(timezone.utc)
+    dates_to_query = [
+        (now_utc - timedelta(days=offset)).strftime("%Y%m%d")
+        for offset in range(0, max(days_back, 1) + 1)
+    ]
+    results_by_pair: dict[str, tuple[int, int]] = {}
+
+    for cfg in LEAGUE_CONFIG:
+        league_name = cfg["name"]
+        slug = cfg["slug"]
+        weight = cfg["weight"]
+        for d_str in dates_to_query:
+            url = f"https://site.api.espn.com/apis/site/v2/sports/soccer/{slug}/scoreboard?dates={d_str}"
+            try:
+                resp = requests.get(url, timeout=6)
+                if resp.status_code != 200:
+                    continue
+                payload = resp.json()
+            except Exception:
+                continue
+
+            for event in payload.get("events", []):
+                parsed = _parse_espn_event(event, league_name, weight)
+                if not parsed:
+                    continue
+                if is_upcoming_fixture(parsed):
+                    continue
+                key = f"{parsed['home'].strip().lower()}||{parsed['away'].strip().lower()}"
+                results_by_pair[key] = (int(parsed["home_score"]), int(parsed["away_score"]))
+
+    return results_by_pair
+
+
+# ==============================================================================
+# AUTOMATIC SETTLEMENT & P&L ENGINE
+# ==============================================================================
+def _evaluate_market_outcome(market: str, home_goals: int, away_goals: int) -> bool:
+    total_goals = home_goals + away_goals
+    m_low = market.lower()
+    if "over 1.5" in m_low:
+        return total_goals >= 2
+    if "over 2.5" in m_low:
+        return total_goals >= 3
+    if "home team over 0.5" in m_low:
+        return home_goals >= 1
+    if "double chance 1x" in m_low:
+        return home_goals >= away_goals
+    if "btts" in m_low and "yes" in m_low:
+        return home_goals >= 1 and away_goals >= 1
+    return total_goals >= 2
+
+
+def _find_match_score(match_label: str, finished_map: dict[str, tuple[int, int]]) -> tuple[int, int] | None:
+    if " vs " not in match_label:
+        return None
+    parts = match_label.split(" vs ", 1)
+    h_key = parts[0].strip().lower()
+    a_key = parts[1].strip().lower()
+    direct = finished_map.get(f"{h_key}||{a_key}")
+    if direct is not None:
+        return direct
+    for pair_key, scores in finished_map.items():
+        p_home, p_away = pair_key.split("||", 1)
+        if (h_key in p_home or p_home in h_key) and (a_key in p_away or p_away in a_key):
+            return scores
+    return None
+
+
+def auto_settle_tickets(
+    sb: Client | None,
+    username: str,
+    tickets: list[dict[str, Any]],
+    weights: dict[str, Any],
+    finished_map: dict[str, tuple[int, int]],
+) -> tuple[int, dict[str, Any]]:
+    settled_count = 0
+    cur_mult = float(weights.get("market_multiplier", 1.00))
+    cur_pen = int(weights.get("penalties", 0))
+    weights_changed = False
+
+    for ticket in tickets:
+        if ticket.get("status") in {"Won", "Lost"}:
+            continue
+        legs = ticket.get("legs") or []
+        if not legs:
+            continue
+
+        leg_outcomes: list[bool | None] = []
+        for leg in legs:
+            score = _find_match_score(get_leg_match(leg), finished_map)
+            if score is None:
+                leg_outcomes.append(None)
+            else:
+                h_g, a_g = score
+                leg_outcomes.append(_evaluate_market_outcome(get_leg_market(leg), h_g, a_g))
+
+        if any(outcome is False for outcome in leg_outcomes):
+            update_ticket_status_in_db(sb, username, ticket, "Lost")
+            cur_mult = round(max(0.80, cur_mult - 0.01), 2)
+            cur_pen += 1
+            weights_changed = True
+            settled_count += 1
+        elif all(outcome is True for outcome in leg_outcomes):
+            update_ticket_status_in_db(sb, username, ticket, "Won")
+            cur_mult = round(min(1.30, cur_mult + 0.01), 2)
+            weights_changed = True
+            settled_count += 1
+
+    updated_weights = {"market_multiplier": cur_mult, "penalties": cur_pen}
+    if weights_changed:
+        update_weights_in_db(sb, username, updated_weights)
+
+    return settled_count, updated_weights
+
+
+def compute_session_pnl(tickets: list[dict[str, Any]]) -> dict[str, Any]:
+    total_staked = sum(int(t.get("stake", 0)) for t in tickets)
+    settled = [t for t in tickets if t.get("status") in {"Won", "Lost"}]
+    won_tickets = [t for t in settled if t.get("status") == "Won"]
+    pending_tickets = [t for t in tickets if t.get("status") not in {"Won", "Lost"}]
+
+    net_pnl = 0
+    for t in settled:
+        st_val = int(t.get("stake", 0))
+        if t.get("status") == "Won":
+            net_pnl += int(t.get("est_payout", round(st_val * float(t.get("odds", 1.0))))) - st_val
+        else:
+            net_pnl -= st_val
+
+    roi_pct = (net_pnl / total_staked * 100.0) if total_staked > 0 else 0.0
+    win_rate = (len(won_tickets) / len(settled) * 100.0) if settled else 0.0
+    return {
+        "total_staked": total_staked,
+        "settled_count": len(settled),
+        "won_count": len(won_tickets),
+        "pending_count": len(pending_tickets),
+        "net_pnl": net_pnl,
+        "roi_pct": roi_pct,
+        "win_rate": win_rate,
+    }
 
 
 # ==============================================================================
@@ -490,7 +651,7 @@ def render_auth_screen(sb: Client | None) -> None:
 
 
 # ==============================================================================
-# MAIN TERMINAL (NATIVE BORDERED CARDS + CLEAN TABS)
+# MAIN TERMINAL (NATIVE BORDERED CARDS + CLEAN TABS + AUTO P&L)
 # ==============================================================================
 def render_terminal(sb: Client | None) -> None:
     window_options = {
@@ -511,6 +672,7 @@ def render_terminal(sb: Client | None) -> None:
         if st.button("Refresh Feed Cache", use_container_width=True):
             st.session_state.fixture_cache_bust += 1
             fetch_espn_fixtures.clear()
+            fetch_recent_finished_results.clear()
             st.rerun()
 
         if st.button("Reset Neural Weights", use_container_width=True):
@@ -536,13 +698,27 @@ def render_terminal(sb: Client | None) -> None:
             else:
                 st.caption("No upcoming fixtures in this window.")
 
-    weights = st.session_state.weights
+    finished_map = fetch_recent_finished_results(
+        days_back=7,
+        cache_bust=st.session_state.fixture_cache_bust,
+    )
+    auto_settled_now, updated_weights = auto_settle_tickets(
+        sb=sb,
+        username=st.session_state.username,
+        tickets=st.session_state.tickets,
+        weights=st.session_state.weights,
+        finished_map=finished_map,
+    )
+    if auto_settled_now > 0 and sb:
+        st.session_state.tickets = load_user_tickets(sb, st.session_state.username)
+
+    weights = updated_weights
     multiplier = float(weights.get("market_multiplier", 1.00))
     penalties = int(weights.get("penalties", 0))
     sync_status = "SUPABASE SYNCED" if sb else "LOCAL SESSION"
 
     st.title("AlphaStake")
-    st.caption(f"Operator: {st.session_state.username} · {sync_status}")
+    st.caption(f"Operator: {st.session_state.username} · {sync_status} · Auto P&L Active")
 
     m1, m2, m3, m4 = st.columns(4)
     with m1:
@@ -563,6 +739,7 @@ def render_terminal(sb: Client | None) -> None:
     )
 
     tickets = st.session_state.tickets
+    pnl = compute_session_pnl(tickets)
 
     # --------------------------------------------------------------------------
     # TAB 1: SLIP GENERATOR & ACTIVE ACCUMULATOR SLIP
@@ -654,9 +831,14 @@ def render_terminal(sb: Client | None) -> None:
     # --------------------------------------------------------------------------
     with tab_history:
         if tickets:
-            h_left, h_right = st.columns([3, 1], vertical_alignment="center")
+            h_left, h_mid, h_right = st.columns([2.2, 1, 1], vertical_alignment="center")
             with h_left:
                 st.subheader(f"Ticket Log ({len(tickets)})")
+            with h_mid:
+                if st.button("Auto-Check Results", use_container_width=True):
+                    st.session_state.fixture_cache_bust += 1
+                    fetch_recent_finished_results.clear()
+                    st.rerun()
             with h_right:
                 if st.button("Clear History Log", use_container_width=True):
                     if sb:
@@ -715,34 +897,34 @@ def render_terminal(sb: Client | None) -> None:
                 st.caption("No logged tickets yet. Generate a slip in the Slip Terminal tab.")
 
     # --------------------------------------------------------------------------
-    # TAB 3: SESSION P&L ANALYTICS
+    # TAB 3: AUTOMATIC SESSION P&L ANALYTICS
     # --------------------------------------------------------------------------
     with tab_pnl:
-        total_staked = sum(int(t.get("stake", 0)) for t in tickets)
-        settled = [t for t in tickets if t.get("status") in {"Won", "Lost"}]
-        won_tickets = [t for t in settled if t.get("status") == "Won"]
-
-        net_pnl = 0
-        for t in settled:
-            st_val = int(t.get("stake", 0))
-            if t.get("status") == "Won":
-                net_pnl += int(t.get("est_payout", round(st_val * float(t.get("odds", 1.0))))) - st_val
-            else:
-                net_pnl -= st_val
-
-        roi_pct = (net_pnl / total_staked * 100.0) if total_staked > 0 else 0.0
-        win_rate = (len(won_tickets) / len(settled) * 100.0) if settled else 0.0
+        with st.container(border=True):
+            top_l, top_r = st.columns([3, 1], vertical_alignment="center")
+            with top_l:
+                st.subheader("Automatic Session P&L")
+                st.caption("Automatically settles finished matches from your 16-league feed and updates P&L, ROI, and win rate.")
+            with top_r:
+                if st.button("Sync Live Results", type="primary", use_container_width=True):
+                    st.session_state.fixture_cache_bust += 1
+                    fetch_recent_finished_results.clear()
+                    st.rerun()
 
         p1, p2, p3 = st.columns(3)
         with p1:
             with st.container(border=True):
-                st.metric("Net P&L", f"{net_pnl:+,} UGX", f"{roi_pct:+.1f}% ROI")
+                st.metric("Net P&L", f"{pnl['net_pnl']:+,} UGX", f"{pnl['roi_pct']:+.1f}% ROI")
         with p2:
             with st.container(border=True):
-                st.metric("Total Staked", f"{total_staked:,} UGX", f"{len(tickets)} tickets")
+                st.metric("Total Staked", f"{pnl['total_staked']:,} UGX", f"{len(tickets)} tickets")
         with p3:
             with st.container(border=True):
-                st.metric("Win Rate", f"{win_rate:.1f}%", f"{len(won_tickets)}/{len(settled)} settled")
+                st.metric(
+                    "Win Rate",
+                    f"{pnl['win_rate']:.1f}%",
+                    f"{pnl['won_count']}/{pnl['settled_count']} settled · {pnl['pending_count']} pending",
+                )
 
 
 # ==============================================================================
