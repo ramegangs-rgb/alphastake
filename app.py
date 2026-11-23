@@ -8,7 +8,7 @@ import streamlit as st
 from supabase import Client, create_client
 
 # ==============================================================================
-# PAGE CONFIG & EXCLUSIVE 17 LEAGUES
+# PAGE CONFIG & EXCLUSIVE 16 LEAGUES (BRAZILIAN SERIE A REMOVED)
 # ==============================================================================
 st.set_page_config(
     page_title="ALPHASTAKE // TERMINAL",
@@ -21,7 +21,6 @@ LEAGUE_CONFIG: list[dict[str, Any]] = [
     {"name": "Ligue 1", "slug": "fra.1", "weight": 1.02},
     {"name": "La Liga", "slug": "esp.1", "weight": 1.05},
     {"name": "Italian Serie A", "slug": "ita.1", "weight": 1.04},
-    {"name": "Brazilian Serie A", "slug": "bra.1", "weight": 1.00},
     {"name": "UEFA Champions League", "slug": "uefa.champions", "weight": 1.06},
     {"name": "UEFA Nations League", "slug": "uefa.nations", "weight": 0.96},
     {"name": "UEFA Conference League", "slug": "uefa.europa.conf", "weight": 0.97},
@@ -628,7 +627,7 @@ def render_auth_screen(sb: Client | None) -> None:
             </div>
             <div>
                 <span class="status-chip {chip_cls}"><span class="dot-live"></span>{chip_txt}</span>
-                <span class="status-chip">17 LEAGUES</span>
+                <span class="status-chip">16 LEAGUES</span>
             </div>
         </div>
         """,
@@ -756,7 +755,7 @@ def render_terminal(sb: Client | None) -> None:
         )
 
         st.markdown("---")
-        with st.expander(f"League Feed Status ({len(active_leagues)}/17)", expanded=False):
+        with st.expander(f"League Feed Status ({len(active_leagues)}/16)", expanded=False):
             if active_leagues:
                 for lg_name, cnt in sorted(active_leagues.items(), key=lambda x: (-x[1], x[0])):
                     st.markdown(f"`{cnt:02d}` · {lg_name}")
@@ -791,7 +790,7 @@ def render_terminal(sb: Client | None) -> None:
             </div>
             <div class="tele-card">
                 <div class="tele-label">Active Leagues</div>
-                <div class="tele-val">{len(active_leagues)} / 17</div>
+                <div class="tele-val">{len(active_leagues)} / 16</div>
             </div>
             <div class="tele-card">
                 <div class="tele-label">Neural Penalties</div>
